@@ -1,0 +1,1 @@
+"""Structured, configurable quality control."""

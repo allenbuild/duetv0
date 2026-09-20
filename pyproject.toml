@@ -15,6 +15,7 @@ dependencies = [
     "pydantic>=2.7",
     "av>=12",
     "rerun-sdk>=0.20",
+    "Pillow>=10",
 ]
 
 [project.optional-dependencies]
