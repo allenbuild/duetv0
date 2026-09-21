@@ -73,6 +73,8 @@ def main():
     ap.add_argument("--speech", action="store_true")
     ap.add_argument("--world", action="store_true", help="add cross-person block (paired view) and restrict to recordings that have it")
     ap.add_argument("--world-subset", action="store_true", help="restrict to recordings with world features without using them")
+    ap.add_argument("--objects", action="store_true", help="append per-person object block (objects_v0.npz: what each hand holds, what gaze is on)")
+    ap.add_argument("--objects-subset", default=None, choices=[None, "leader", "both"], help="restrict to recordings whose object block exists for the leader / for both roles")
     ap.add_argument("--tasks", default="handover_active,onset_within_2s,onset_within_5s,ja_active")
     ap.add_argument("--views", default="leader,helper,both")
     ap.add_argument("--out", default="outputs/paired_benchmark/baseline_gbdt.json")
@@ -84,6 +86,15 @@ def main():
     recs = load_recordings(ROOT / "data/processed/comind", train_ids)
     if a.world or a.world_subset:
         recs = [r for r in recs if r.w is not None]
+    OBJ = 31
+    objs = {}
+    for r in recs:
+        p = ROOT / "data/processed/comind" / r.rid / "objects_v0.npz"
+        objs[r.rid] = np.load(p)["objects"] if p.exists() else None
+    if a.objects_subset == "leader":
+        recs = [r for r in recs if objs[r.rid] is not None and objs[r.rid][:, OBJ - 1].max() > 0]
+    elif a.objects_subset == "both":
+        recs = [r for r in recs if objs[r.rid] is not None and objs[r.rid][:, OBJ - 1].max() > 0 and objs[r.rid][:, 2 * OBJ - 1].max() > 0]
     rng = np.random.default_rng(0); order = rng.permutation(len(recs)); K = 5
     folds = [sorted(order[i::K].tolist()) for i in range(K)]
     print(f"recordings {len(recs)}, handovers {sum(len(r.handover_onsets) for r in recs)}, speech={a.speech} world={a.world}", flush=True)
@@ -91,6 +102,11 @@ def main():
     for r in recs:
         sp = r.s if a.speech else None
         X[r.rid] = {"leader": featurize(person_base(r.x, "leader", sp)), "helper": featurize(person_base(r.x, "helper", sp))}
+        if a.objects:
+            ob = objs[r.rid] if objs[r.rid] is not None else np.zeros((len(r.x), 2 * OBJ), np.float32)
+            # object flags are 3 Hz sample-and-hold; summarise with 1 s / 3 s windows like everything else
+            X[r.rid]["leader"] = np.concatenate([X[r.rid]["leader"], featurize(ob[:, :OBJ])], axis=1)
+            X[r.rid]["helper"] = np.concatenate([X[r.rid]["helper"], featurize(ob[:, OBJ:])], axis=1)
         if a.world and r.w is not None:
             X[r.rid]["world"] = featurize(r.w[:, :31].astype(np.float32))
     res = {}
