@@ -28,12 +28,15 @@ def gbdt(files, task):
 
 G = ["outputs/paired_benchmark/baseline_gbdt_speech.json", "outputs/paired_benchmark/baseline_gbdt_speech_h12.json", "outputs/paired_benchmark/baseline_gbdt_speech_shuffled.json"]
 
+SC = ["outputs/paired_benchmark/baseline_gbdt_scoia.json"]
 panels = [
     ("joint attention now", None, gbdt(G, "ja_active")),
     ("handover in progress", None, gbdt(G, "handover_active")),
     ("handover starts in <5 s", None, gbdt(G, "onset_within_5s")),
+    ("helper's next action starts in <2 s", None, gbdt(SC, "scoia_onset_within_2s")),
 ]
-fig, axes = plt.subplots(1, 3, figsize=(13, 4.4))
+panels = [p for p in panels if p[2]]
+fig, axes = plt.subplots(1, len(panels), figsize=(4.4 * len(panels), 4.4))
 for ax, (title, t, g) in zip(axes, panels):
     vals = {v: (a.mean(), a.std()) for v, a in t.items()} if t else g
     vs = [v for v in VIEWS if v in vals]

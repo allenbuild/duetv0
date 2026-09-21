@@ -15,7 +15,7 @@ RUNS = [
     ("v4 shared-world block, 11 labelled recs (world)", "outputs/paired_benchmark_v4_world/world"),
     ("v4 same 11 recs, no world block", "outputs/paired_benchmark_v4_world/noworld"),
 ]
-TASKS = ["handover_active", "onset_within_1s", "onset_within_2s", "onset_within_5s", "ja_active"]
+TASKS = ["handover_active", "onset_within_1s", "onset_within_2s", "onset_within_5s", "ja_active", "scoia_active", "scoia_onset_within_2s", "scoia_onset_within_5s"]
 VIEWS = ["leader", "helper", "both_shuffled", "both"]
 
 def load(d):
@@ -26,7 +26,7 @@ def load(d):
             r = json.load(open(p)); pf += r["per_fold"]; info = r["info"]
     return pf, info
 
-lines = ["| run | view | " + " | ".join(t.replace("onset_within_", "onset<").replace("handover_active", "handover now").replace("ja_active", "joint attn") for t in TASKS) + " |",
+lines = ["| run | view | " + " | ".join(t.replace("scoia_onset_within_", "helper act<").replace("scoia_active", "helper act now").replace("onset_within_", "onset<").replace("handover_active", "handover now").replace("ja_active", "joint attn") for t in TASKS) + " |",
          "|---|---|" + "---|" * len(TASKS)]
 for name, d in RUNS:
     pf, info = load(d)
@@ -44,7 +44,8 @@ for name, d in RUNS:
                 cells.append("")
         lines.append(f"| {name} ({info['n_recordings']} recs) | {v} | " + " | ".join(cells) + " |")
 for f, label in [("outputs/paired_benchmark/baseline_handcrafted.json", "linear (logistic) on wrist-speed features"), ("outputs/paired_benchmark/baseline_gbdt_speech.json", "GBDT on window features + speech"),
-                 ("outputs/paired_benchmark/baseline_gbdt_speech_h12.json", "GBDT on window features + speech"), ("outputs/paired_benchmark/baseline_gbdt_speech_shuffled.json", "GBDT on window features + speech")]:
+                 ("outputs/paired_benchmark/baseline_gbdt_speech_h12.json", "GBDT on window features + speech"), ("outputs/paired_benchmark/baseline_gbdt_speech_shuffled.json", "GBDT on window features + speech"),
+                 ("outputs/paired_benchmark/baseline_gbdt_grasp.json", "GBDT + speech + grasp-state proxies"), ("outputs/paired_benchmark/baseline_gbdt_scoia.json", "GBDT + speech (helper-action tasks)")]:
     p = Path(f)
     if not p.exists():
         continue
