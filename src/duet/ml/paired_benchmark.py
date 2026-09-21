@@ -39,7 +39,8 @@ from torch import nn
 from duet.adapters.comind.kinematics import PERSON_DIM
 
 CLS_TASKS = ("handover_active", "onset_within_2s", "onset_within_5s", "ja_active")
-ALL_LABELS = ("handover_active", "onset_within_1s", "onset_within_2s", "onset_within_3s", "onset_within_5s", "ja_active")
+ALL_LABELS = ("handover_active", "onset_within_1s", "onset_within_2s", "onset_within_3s", "onset_within_5s", "ja_active",
+              "scoia_active", "scoia_onset_within_2s", "scoia_onset_within_5s")
 REG_MAX_S = 8.0
 
 

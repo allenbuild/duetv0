@@ -65,6 +65,21 @@ def load_joint_attention_intervals(annotations_dir: Path, recording_id: str) -> 
     return out
 
 
+def load_scoia_intervals(annotations_dir: Path, recording_id: str) -> list[dict]:
+    """Helper's socially-conditioned object interactions (SCOIA): start/end frame, verb, cue type."""
+    d = json.load(open(annotations_dir / "dataset_scoia_consolidated.json"))["data"]
+    v = d.get(recording_id) or {}
+    items = v.values() if isinstance(v, dict) else v
+    out = []
+    for x in items:
+        if x is None:
+            continue
+        out.append({"start_frame": int(x["start_frame"]), "end_frame": int(x["end_frame"]), "verbs": list(x.get("verbs") or []),
+                    "cue": x.get("annot_type"), "nouns_l3": list(x.get("nouns_level3") or []), "description": x.get("description")})
+    out.sort(key=lambda e: e["start_frame"])
+    return out
+
+
 def interval_mask(n: int, intervals, inclusive_end: bool = True) -> np.ndarray:
     m = np.zeros(n, dtype=np.float32)
     for s, e in intervals:
@@ -114,7 +129,9 @@ def time_to_completion(n: int, intervals) -> np.ndarray:
 def build_frame_labels(annotations_dir: Path, recording_id: str, n: int, horizons_s=(1.0, 2.0, 3.0, 5.0)) -> dict:
     hos = load_handovers(annotations_dir, recording_id)
     ja = load_joint_attention_intervals(annotations_dir, recording_id)
+    sc = load_scoia_intervals(annotations_dir, recording_id)
     onsets = [e.start_frame for e in hos if 0 <= e.start_frame < n]
+    sc_onsets = [e["start_frame"] for e in sc if 0 <= e["start_frame"] < n]
     labels = {
         "handover_active": interval_mask(n, [(e.start_frame, e.end_frame) for e in hos]),
         "ja_active": interval_mask(n, [(s, e) for s, e, _ in ja]),
@@ -123,4 +140,7 @@ def build_frame_labels(annotations_dir: Path, recording_id: str, n: int, horizon
     }
     for h in horizons_s:
         labels[f"onset_within_{h:g}s"] = onset_within(n, onsets, int(round(h * FPS)))
-    return {"labels": labels, "handovers": hos, "n_joint_attention": len(ja)}
+    labels["scoia_active"] = interval_mask(n, [(e["start_frame"], e["end_frame"]) for e in sc])
+    for h in (2.0, 5.0):
+        labels[f"scoia_onset_within_{h:g}s"] = onset_within(n, sc_onsets, int(round(h * FPS)))
+    return {"labels": labels, "handovers": hos, "n_joint_attention": len(ja), "scoia": sc}

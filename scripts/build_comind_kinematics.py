@@ -48,6 +48,7 @@ def main() -> None:
             "stats": k["stats"],
             "handovers": [dataclasses.asdict(e) for e in lab["handovers"]],
             "n_joint_attention": lab["n_joint_attention"],
+            "scoia": lab["scoia"],
             "prevalence": {key: float(v[np.isfinite(v)].mean()) if v.size else 0.0 for key, v in lab["labels"].items() if key not in ("tth_s", "tte_s")},
         }
         json.dump(meta, open(proc / rid / "kinematics_v0.json", "w"), indent=1)

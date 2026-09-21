@@ -45,6 +45,12 @@ def person_base(f: np.ndarray, role: str, speech: np.ndarray | None) -> np.ndarr
         w = f[:, b + 15: b + 18]; v = f[:, b + 25] > 0
         sp = np.linalg.norm(np.diff(w, axis=0, prepend=w[:1]), axis=1) * FPS; sp[~v] = 0
         cols += [sp, v.astype(np.float32), w[:, 1] * v, w[:, 2] * v]  # speed, valid, height-ish, depth-ish
+        # grasp-state proxies (object-perception stand-in): thumb-index aperture, fingertip spread, palm-to-wrist extent
+        tips = f[:, b: b + 15].reshape(-1, 5, 3)
+        aperture = np.linalg.norm(tips[:, 0] - tips[:, 1], axis=1) * v
+        spread = tips.std(axis=1).sum(axis=1) * v
+        palm = f[:, b + 18: b + 21]
+        cols += [aperture, spread, np.linalg.norm(palm - w, axis=1) * v]
         hands.append((w, v))
     d = np.linalg.norm(hands[0][0] - hands[1][0], axis=1) * (hands[0][1] & hands[1][1])
     g = f[:, s.start + 2 * HAND_DIM: s.start + 2 * HAND_DIM + 3]
