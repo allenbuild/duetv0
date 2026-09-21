@@ -72,16 +72,22 @@ def main() -> None:
     ap.add_argument("--task-weights", default="1,1,1,1", help="loss weights for handover_active,onset_1s,onset_2s,ja_active")
     ap.add_argument("--pos-weight-cap", type=float, default=20.0)
     ap.add_argument("--dropout", type=float, default=0.1)
+    ap.add_argument("--speech", action="store_true", help="append per-person speech features from transcripts")
+    ap.add_argument("--world", action="store_true", help="append cross-person shared-world block to the paired view; restricts to recordings that have it")
+    ap.add_argument("--world-subset", action="store_true", help="restrict to recordings with world features without using them (control)")
+    ap.add_argument("--select-metric", default="mean_auroc", choices=["mean_auroc", "mean_ap"])
     a = ap.parse_args()
     out = Path(a.out); out.mkdir(parents=True, exist_ok=True)
     train_ids, _ = official_split()
     recs = load_recordings(Path(a.proc_root), train_ids)
+    if a.world or "--world-subset" in sys.argv:
+        recs = [r for r in recs if r.w is not None]
     rng = np.random.default_rng(a.seed)
     order = rng.permutation(len(recs))
     folds = [sorted(order[i::a.folds].tolist()) for i in range(a.folds)]
     info = {"n_recordings": len(recs), "hours": sum(len(r.x) for r in recs) / FPS / 3600,
             "handovers": sum(len(r.handover_onsets) for r in recs), "folds": a.folds, "steps": a.steps,
-            "device": TrainConfig().device, "onset_crop_frac": a.onset_crop_frac, "task_weights": a.task_weights, "pos_weight_cap": a.pos_weight_cap, "dropout": a.dropout, "channels": a.channels, "recording_ids": [r.rid for r in recs]}
+            "device": TrainConfig().device, "onset_crop_frac": a.onset_crop_frac, "task_weights": a.task_weights, "pos_weight_cap": a.pos_weight_cap, "dropout": a.dropout, "channels": a.channels, "speech": a.speech, "world": a.world, "select_metric": a.select_metric, "recording_ids": [r.rid for r in recs]}
     print(json.dumps({k: v for k, v in info.items() if k != "recording_ids"}, indent=1), flush=True)
     log_f = open(out / "train.log", "a")
 
@@ -97,7 +103,7 @@ def main() -> None:
             tr = [recs[i] for j in range(a.folds) if j not in (k, (k + 1) % a.folds) for i in folds[j]]
             cfg = TrainConfig(steps=a.steps, eval_every=a.eval_every, channels=a.channels, seed=a.seed * 100 + k,
                               onset_crop_frac=a.onset_crop_frac, task_weights=tuple(float(v) for v in a.task_weights.split(",")),
-                              pos_weight_cap=a.pos_weight_cap, dropout=a.dropout)
+                              pos_weight_cap=a.pos_weight_cap, dropout=a.dropout, use_speech=a.speech, use_world=a.world, select_metric=a.select_metric)
             t0 = time.time()
             res, _, model, norm = train_view(tr, va, te, view, cfg, log=log)
             res["fold"] = k
@@ -106,7 +112,7 @@ def main() -> None:
                 + f" tthMAE={res['test'][REG_TASK]['mae_s']:.2f}s ({time.time()-t0:.0f}s)")
             # pool held-out predictions
             for r in te:
-                p, reg = predict(model, norm(view_input(r.x, view, np.random.default_rng(321))), cfg)
+                p, reg = predict(model, norm(view_input(r.x, view, np.random.default_rng(321), r.s if cfg.use_speech else None, r.w if cfg.use_world else None)), cfg)
                 valid = np.ones(len(r.x), bool); valid[: 2 * FPS] = False
                 for i, t in enumerate(CLS_TASKS):
                     pool[t]["y"].append(r.y[t][valid]); pool[t]["p"].append(p[valid, i])

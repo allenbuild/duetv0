@@ -53,6 +53,8 @@ class Recording:
     x: np.ndarray  # [N, 2*PERSON_DIM]
     y: dict[str, np.ndarray]  # per-frame labels
     handover_onsets: list[int] = field(default_factory=list)
+    s: np.ndarray | None = None  # [N, 2*SPEECH_DIM] optional speech block (leader, helper)
+    w: np.ndarray | None = None  # [N, WORLD_DIM] optional cross-person shared-world block
 
 
 def load_recordings(proc_root: Path, ids: list[str]) -> list[Recording]:
@@ -64,20 +66,34 @@ def load_recordings(proc_root: Path, ids: list[str]) -> list[Recording]:
         z = np.load(p)
         meta = json.load(open(proc_root / rid / "kinematics_v0.json"))
         y = {k: z[k] for k in CLS_TASKS + (REG_TASK,)}
-        out.append(Recording(rid, z["features"], y, [h["start_frame"] for h in meta["handovers"]]))
+        sp = proc_root / rid / "speech_v0.npz"
+        speech = np.load(sp)["speech"] if sp.exists() else None
+        wp = proc_root / rid / "world_v0.npz"
+        world = np.load(wp)["world"] if wp.exists() else None
+        out.append(Recording(rid, z["features"], y, [h["start_frame"] for h in meta["handovers"]], speech, world))
     return out
 
 
-def view_input(x: np.ndarray, view: str, rng: np.random.Generator | None) -> np.ndarray:
-    """Select the input block(s) for a view. Returns [N, D_view]."""
+def view_input(x: np.ndarray, view: str, rng: np.random.Generator | None, speech: np.ndarray | None = None,
+               world: np.ndarray | None = None) -> np.ndarray:
+    """Select the input block(s) for a view. Returns [N, D_view].
+
+    If ``speech`` is given, each person's speech block is appended to that person's
+    kinematics block (and shuffled together with it for ``both_shuffled``).
+    """
     L = x[:, :PERSON_DIM]
     H = x[:, PERSON_DIM:]
+    if speech is not None:
+        half = speech.shape[1] // 2
+        L = np.concatenate([L, speech[:, :half]], axis=1)
+        H = np.concatenate([H, speech[:, half:]], axis=1)
     if view == "leader":
         return L
     if view == "helper":
         return H
     if view == "both":
-        return x
+        blocks = [L, H] + ([world] if world is not None else [])
+        return np.concatenate(blocks, axis=1)
     if view == "both_shuffled":
         n = len(x)
         rng = rng or np.random.default_rng(0)
@@ -173,6 +189,9 @@ class TrainConfig:
     task_weights: tuple = (1.0, 1.0, 1.0, 1.0)
     pos_weight_cap: float = 20.0
     dropout: float = 0.1
+    use_speech: bool = False
+    use_world: bool = False
+    select_metric: str = "mean_auroc"  # or mean_ap
 
 
 def _pos_weights(recs: list[Recording], cap: float = 20.0) -> torch.Tensor:
@@ -207,8 +226,8 @@ def _sample_batch(recs, view, norm, cfg, rng, cache, onset_recs=()):
     return x, y, t
 
 
-def _build_cache(recs, view, norm, rng):
-    return {(r.rid, view): norm(view_input(r.x, view, rng)).astype(np.float32) for r in recs}
+def _build_cache(recs, view, norm, rng, cfg):
+    return {(r.rid, view): norm(view_input(r.x, view, rng, r.s if cfg.use_speech else None, r.w if cfg.use_world else None)).astype(np.float32) for r in recs}
 
 
 @torch.no_grad()
@@ -225,7 +244,7 @@ def evaluate(model, recs, view, norm, cfg, rng, want_preds=False):
     ys = {t: [] for t in CLS_TASKS}
     tth_err, preds = [], {}
     for r in recs:
-        p, reg = predict(model, norm(view_input(r.x, view, rng)), cfg)
+        p, reg = predict(model, norm(view_input(r.x, view, rng, r.s if cfg.use_speech else None, r.w if cfg.use_world else None)), cfg)
         # ignore the first 2 s (model warm-up) and frames where both people's hands+gaze are absent
         valid = np.ones(len(r.x), bool)
         valid[: 2 * FPS] = False
@@ -248,14 +267,15 @@ def evaluate(model, recs, view, norm, cfg, rng, want_preds=False):
         }
     out[REG_TASK] = {"mae_s": float(np.concatenate(tth_err).mean()) if tth_err else float("nan")}
     out["_summary_ap"] = float(np.nanmean([out[t]["ap"] for t in CLS_TASKS]))
+    out["_summary_auroc"] = float(np.nanmean([out[t]["auroc"] for t in CLS_TASKS]))
     return (out, preds) if want_preds else out
 
 
 def train_view(train_recs, val_recs, test_recs, view: str, cfg: TrainConfig, log=print, want_preds_for=()):
     torch.manual_seed(cfg.seed)
     rng = np.random.default_rng(cfg.seed)
-    norm = Normalizer([view_input(r.x, view, rng) for r in train_recs])
-    cache = _build_cache(train_recs, view, norm, rng)
+    norm = Normalizer([view_input(r.x, view, rng, r.s if cfg.use_speech else None, r.w if cfg.use_world else None) for r in train_recs])
+    cache = _build_cache(train_recs, view, norm, rng, cfg)
     d_in = 2 * next(iter(cache.values())).shape[1]
     model = CausalTCN(d_in, c=cfg.channels, dropout=cfg.dropout).to(cfg.device)
     opt = torch.optim.AdamW(model.parameters(), lr=cfg.lr, weight_decay=1e-2)
@@ -283,10 +303,11 @@ def train_view(train_recs, val_recs, test_recs, view: str, cfg: TrainConfig, log
         sched.step()
         if step % cfg.eval_every == 0 or step == cfg.steps:
             val = evaluate(model, val_recs, view, norm, cfg, np.random.default_rng(123))
-            log(f"[{view} s{cfg.seed}] step {step} loss {loss.item():.3f} val meanAP {val['_summary_ap']:.4f} "
+            log(f"[{view} s{cfg.seed}] step {step} loss {loss.item():.3f} val meanAUROC {val['_summary_auroc']:.4f} "
                 + " ".join(f"{t}={val[t]['ap']:.3f}" for t in CLS_TASKS) + f" tthMAE={val[REG_TASK]['mae_s']:.2f} ({time.time()-t0:.0f}s)")
-            if val["_summary_ap"] > best:
-                best = val["_summary_ap"]
+            score = val["_summary_auroc"] if cfg.select_metric == "mean_auroc" else val["_summary_ap"]
+            if best_state is None or score > best:
+                best = score if np.isfinite(score) else best
                 best_state = {k: v.detach().clone() for k, v in model.state_dict().items()}
     model.load_state_dict(best_state)
     test, preds = evaluate(model, test_recs, view, norm, cfg, np.random.default_rng(321), want_preds=True)

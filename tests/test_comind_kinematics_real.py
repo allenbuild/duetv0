@@ -78,3 +78,16 @@ def test_onset_within_and_tth_are_strictly_future():
 def test_hand_block_layout():
     assert HAND_DIM == 26 and PERSON_DIM == 59
     assert person_slice("leader") == slice(0, 59) and person_slice("helper") == slice(59, 118)
+
+
+def test_world_transforms_round_trip():
+    from duet.adapters.comind.shared_world_features import quat_xyzw_to_R, to_device, to_world
+
+    rng = np.random.default_rng(0)
+    q = rng.normal(size=(5, 4)); q /= np.linalg.norm(q, axis=1, keepdims=True)
+    R = quat_xyzw_to_R(q); t = rng.normal(size=(5, 3)); p = rng.normal(size=(5, 3, 3))
+    assert np.allclose(np.einsum("nij,nkj->nik", R, R), np.eye(3)[None], atol=1e-9)
+    assert np.allclose(to_device(R, t, to_world(R, t, p)), p, atol=1e-9)
+    # quarter turn about z maps x -> y (active rotation, same convention as duet.geometry.rotations)
+    Rz = quat_xyzw_to_R(np.array([[0, 0, np.sin(np.pi / 4), np.cos(np.pi / 4)]]))
+    assert np.allclose(Rz[0] @ np.array([1, 0, 0]), [0, 1, 0], atol=1e-9)
