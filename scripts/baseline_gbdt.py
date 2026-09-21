@@ -115,6 +115,8 @@ def main():
                 clf.fit(Xtr, Ytr[t]); p = np.nan_to_num(clf.predict_proba(Xte)[:, 1], nan=0.5)
                 pool[t][0].append(Yte[t]); pool[t][1].append(p)
                 fold_probs[t] = clf
+                if 0 < Yte[t].sum() < len(Yte[t]):
+                    per_fold[t].append(roc_auc_score(Yte[t], p))
             if a.save_preds_dir:
                 out_dir = Path(a.save_preds_dir); out_dir.mkdir(parents=True, exist_ok=True)
                 for r in te:
@@ -126,8 +128,6 @@ def main():
                         full[:, ti] = np.interp(np.arange(len(r.x)), idx, pr)
                     np.savez_compressed(out_dir / f"preds_{view}_{r.rid[:8]}.npz", probs=full.astype(np.float16))
                 json.dump({"info": {"tasks": tasks, "n_recordings": len(recs), "model": "HistGradientBoosting on window features"}}, open(Path(a.save_preds_dir) / "results.json", "w"))
-                if 0 < Yte[t].sum() < len(Yte[t]):
-                    per_fold[t].append(roc_auc_score(Yte[t], p))
             print(f"  {view} fold {k} done", flush=True)
         res[view] = {t: {"ap_pooled": float(average_precision_score(np.concatenate(pool[t][0]), np.concatenate(pool[t][1]))),
                          "auroc_fold_mean": float(np.mean(per_fold[t])), "auroc_fold_sd": float(np.std(per_fold[t]))} for t in tasks}

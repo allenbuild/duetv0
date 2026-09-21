@@ -22,18 +22,18 @@ Date: 2026-09-21. Follows [v0](paired_kinematics_benchmark_v0.md). Everything he
 |---|---|---|---|---|---|
 | leader only | 0.633 ± 0.033 | 0.621 ± 0.038 | 0.579 ± 0.040 | 0.583 ± 0.041 | 0.576 ± 0.036 |
 | helper only | 0.675 ± 0.046 | 0.624 ± 0.041 | 0.585 ± 0.033 | 0.597 ± 0.036 | 0.589 ± 0.031 |
-| both, partner time-shuffled | SHUF_JA | SHUF_HO | – | – | SHUF_ON5 |
+| both, partner time-shuffled | 0.635 ± 0.041 | 0.607 ± 0.043 | – | – | 0.574 ± 0.027 |
 | **both, paired** | **0.719 ± 0.043** | **0.662 ± 0.042** | **0.597 ± 0.030** | 0.595 ± 0.029 | **0.609 ± 0.043** |
 
 TCN (v0/v3) for reference, paired view: joint attention 0.690, handover in progress 0.654, onset < 2 s 0.566.
 
 ## Reading it
 
-1. **Joint attention is now a solid result**: paired 0.72 vs best single 0.68 vs shuffled control near chance, and the shared-world block adds another +0.08 where it exists. This is the "second person carries information" claim with two independent controls.
-2. **Handover in progress**: paired 0.66 vs single 0.62. Consistent across TCN and GBDT, modest.
-3. **Handover anticipation is still weak for everyone.** Best anticipation of an onset 5 s out is 0.61 AUROC; at 1–2 s it is ≈ 0.60; the paired edge over the helper-only view is 0.02 at 5 s and zero at 2 s. Event-level recall at 5 % false alarms is under 10 % in every configuration. None of the levers moved it by more than a few points. This is not a training bug any more: a linear model, a TCN and boosted trees on three feature sets all land in the same place.
+1. **Joint attention is now a solid result**: paired 0.72 vs best single 0.68 vs shuffled control 0.64, and the shared-world block adds another +0.08 where it exists. This is the "second person carries information" claim with two independent controls.
+2. **Handover in progress**: paired 0.66 vs single 0.62 vs shuffled 0.61. Consistent across TCN and GBDT, modest.
+3. **Handover anticipation is still weak for everyone.** Best anticipation of an onset 5 s out is 0.61 AUROC; at 1–2 s it is ≈ 0.60; the paired edge over the helper-only view is 0.02 at 5 s (and 0.035 over the shuffled control) and zero at 2 s. Event-level recall at 5 % false alarms is under 10 % in every configuration. None of the levers moved it by more than a few points. This is not a training bug any more: a linear model, a TCN and boosted trees on three feature sets all land in the same place.
 4. What the anticipation failure is telling us, concretely:
-   - The cue that precedes a handover is mostly *what is said* and *what is looked at*. Speech arrives 3 s before the reach, but our transcript features are crude and ASR in a kitchen is noisy; the sentence-embedding run tests how much headroom there is.
+   - The cue that precedes a handover is mostly *what is said* and *what is looked at*. Speech arrives 3 s before the reach, but neither keyword features nor MiniLM sentence embeddings of the noisy kitchen ASR moved anticipation; the request signal is either not in the transcript or needs who-said-it diarisation.
    - Gaze is in the input, but without object positions (needs vision) or the partner's position (needs the shared world, which only 11 labelled recordings have) the model cannot tell *what* is being looked at. The v4 joint-attention jump (+0.08 from geometry alone on 11 recordings) says exactly this signal matters.
    - CoMind's own VLM baselines with full video and 10 s of transcript reach 13 % on time-to-handover. Anticipating a kitchen handover seconds ahead is hard for everyone; our result is in line with theirs, from a far cheaper sensor set.
 

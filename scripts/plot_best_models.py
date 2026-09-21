@@ -19,14 +19,19 @@ def tcn(run, task):
         if p.exists(): pf += json.load(open(p))["per_fold"]
     return {v: np.array([r["test"][task]["auroc"] for r in pf if r["view"] == v]) for v in VIEWS if any(r["view"] == v for r in pf)}
 
-def gbdt(f, task):
-    r = json.load(open(f))["results"]
-    return {v: (r[v][task]["auroc_fold_mean"], r[v][task]["auroc_fold_sd"]) for v in r if task in r[v]}
+def gbdt(files, task):
+    out = {}
+    for f in files:
+        r = json.load(open(f))["results"]
+        out.update({v: (r[v][task]["auroc_fold_mean"], r[v][task]["auroc_fold_sd"]) for v in r if task in r[v] and np.isfinite(r[v][task]["auroc_fold_mean"])})
+    return out
+
+G = ["outputs/paired_benchmark/baseline_gbdt_speech.json", "outputs/paired_benchmark/baseline_gbdt_speech_h12.json", "outputs/paired_benchmark/baseline_gbdt_speech_shuffled.json"]
 
 panels = [
-    ("joint attention now\n(TCN, hands+gaze, v0)", tcn("outputs/paired_benchmark", "ja_active"), None),
-    ("handover in progress\n(GBDT, hands+gaze+speech)", None, gbdt("outputs/paired_benchmark/baseline_gbdt_speech.json", "handover_active")),
-    ("handover starts in <5 s\n(GBDT, hands+gaze+speech)", None, gbdt("outputs/paired_benchmark/baseline_gbdt_speech.json", "onset_within_5s")),
+    ("joint attention now", None, gbdt(G, "ja_active")),
+    ("handover in progress", None, gbdt(G, "handover_active")),
+    ("handover starts in <5 s", None, gbdt(G, "onset_within_5s")),
 ]
 fig, axes = plt.subplots(1, 3, figsize=(13, 4.4))
 for ax, (title, t, g) in zip(axes, panels):
@@ -37,5 +42,5 @@ for ax, (title, t, g) in zip(axes, panels):
     ax.set_ylim(0.4, 0.8); ax.set_title(title, fontsize=11); ax.set_ylabel("AUROC (mean ± sd, 5 held-out folds)")
     for i, v in enumerate(vs): ax.text(i, vals[v][0] + vals[v][1] + 0.008, f"{vals[v][0]:.3f}", ha="center", fontsize=9)
     ax.legend(fontsize=8, loc="upper left")
-fig.suptitle("CoMind, 44 recordings / 21 h / 248 handovers, recording-level CV. No pixels: Aria hand tracking + gaze (+ transcript speech features).", fontsize=10)
+fig.suptitle("Best model (gradient-boosted trees on causal window features). CoMind, 44 recordings / 21 h / 248 handovers, recording-level CV.\nNo pixels: Aria hand tracking + gaze + transcript speech features. Shuffled = partner stream time-shifted ≥ 60 s (same inputs, interaction destroyed).", fontsize=10)
 fig.tight_layout(); fig.savefig(OUT / "best_models.png", dpi=150); print(OUT / "best_models.png")
