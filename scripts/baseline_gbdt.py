@@ -25,7 +25,7 @@ sys.path.insert(0, str(ROOT / "src"))
 from duet.adapters.comind.kinematics import HAND_DIM, person_slice  # noqa: E402
 from duet.ml.paired_benchmark import FPS, load_recordings  # noqa: E402
 
-WINDOWS = (FPS, 3 * FPS, 6 * FPS)
+WINDOWS = (FPS, 3 * FPS)
 STRIDE = 6  # evaluate every 6th frame (5 Hz) to keep the tree fit tractable
 
 
@@ -58,7 +58,8 @@ def person_base(f: np.ndarray, role: str, speech: np.ndarray | None) -> np.ndarr
 
 
 def featurize(base: np.ndarray) -> np.ndarray:
-    return np.concatenate([base] + [causal_stats(base, w) for w in WINDOWS], axis=1)
+    base = np.nan_to_num(base, nan=0.0, posinf=0.0, neginf=0.0)
+    return np.nan_to_num(np.concatenate([base] + [causal_stats(base, w) for w in WINDOWS], axis=1), nan=0.0, posinf=0.0, neginf=0.0)
 
 
 def main():
@@ -69,6 +70,7 @@ def main():
     ap.add_argument("--tasks", default="handover_active,onset_within_2s,onset_within_5s,ja_active")
     ap.add_argument("--views", default="leader,helper,both")
     ap.add_argument("--out", default="outputs/paired_benchmark/baseline_gbdt.json")
+    ap.add_argument("--save-preds-dir", default=None, help="also write held-out per-frame probs as preds_<view>_<rid8>.npz (+ results.json info) for the demo renderer")
     a = ap.parse_args()
     tasks = a.tasks.split(",")
     src = (ROOT / "scripts/comind_download.py").read_text()
@@ -92,22 +94,38 @@ def main():
             te = [recs[i] for i in folds[k]]; tr = [recs[i] for j in range(K) if j != k for i in folds[j]]
 
             def mk(rs, view=view):
-                blocks = ("leader", "helper") if view == "both" else (view,)
+                blocks = ("leader", "helper") if view in ("both", "both_shuffled") else (view,)
                 xs = []
                 for r in rs:
                     parts = [X[r.rid][b] for b in blocks]
+                    if view == "both_shuffled":  # same control as the TCN: partner stream circularly shifted >= 60 s
+                        n = len(parts[1]); shift = int(np.random.default_rng(hash(r.rid) % 2**32).integers(60 * FPS, max(60 * FPS + 1, n - 60 * FPS)))
+                        parts[1] = np.roll(parts[1], shift, axis=0)
                     if view == "both" and "world" in X[r.rid]:
                         parts.append(X[r.rid]["world"])
                     xs.append(np.concatenate(parts, axis=1)[2 * FPS::STRIDE])
                 return np.concatenate(xs), {t: np.concatenate([r.y[t][2 * FPS::STRIDE] for r in rs]) for t in tasks}
 
             Xtr, Ytr = mk(tr); Xte, Yte = mk(te)
+            fold_probs = {}
             for t in tasks:
                 pos = Ytr[t].mean()
-                clf = HistGradientBoostingClassifier(max_iter=150, learning_rate=0.1, max_leaf_nodes=31, min_samples_leaf=200,
+                clf = HistGradientBoostingClassifier(max_iter=100, learning_rate=0.15, max_leaf_nodes=31, min_samples_leaf=200,
                                                      l2_regularization=1.0, class_weight={0: 1.0, 1: float(min(50, (1 - pos) / max(pos, 1e-4)))}, random_state=k)
-                clf.fit(Xtr, Ytr[t]); p = clf.predict_proba(Xte)[:, 1]
+                clf.fit(Xtr, Ytr[t]); p = np.nan_to_num(clf.predict_proba(Xte)[:, 1], nan=0.5)
                 pool[t][0].append(Yte[t]); pool[t][1].append(p)
+                fold_probs[t] = clf
+            if a.save_preds_dir:
+                out_dir = Path(a.save_preds_dir); out_dir.mkdir(parents=True, exist_ok=True)
+                for r in te:
+                    Xr, _ = mk([r])
+                    full = np.zeros((len(r.x), len(tasks)), np.float32)
+                    for ti, t in enumerate(tasks):
+                        pr = fold_probs[t].predict_proba(Xr)[:, 1]
+                        idx = np.arange(2 * FPS, len(r.x), STRIDE)[: len(pr)]
+                        full[:, ti] = np.interp(np.arange(len(r.x)), idx, pr)
+                    np.savez_compressed(out_dir / f"preds_{view}_{r.rid[:8]}.npz", probs=full.astype(np.float16))
+                json.dump({"info": {"tasks": tasks, "n_recordings": len(recs), "model": "HistGradientBoosting on window features"}}, open(Path(a.save_preds_dir) / "results.json", "w"))
                 if 0 < Yte[t].sum() < len(Yte[t]):
                     per_fold[t].append(roc_auc_score(Yte[t], p))
             print(f"  {view} fold {k} done", flush=True)
