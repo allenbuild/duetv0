@@ -47,7 +47,17 @@ By cue type: gestural handovers are the shortest (1.9 s) and most synchronous (0
 
 ## New result 3: partner-trajectory forecasting
 
-FORECAST_PLACEHOLDER
+Target: the helper's two wrist positions 0.5 s and 1.0 s ahead (displacement in the helper's own frame). Causal TCN, 5 folds, helper target only (the leader target was stopped to save compute once the pattern was clear). Mean Euclidean error:
+
+| input | 0.5 s, all frames | 1.0 s, all frames | 0.5 s, within ±3 s of a handover | 1.0 s, within ±3 s of a handover |
+|---|---|---|---|---|
+| baseline: hand stays still | 7.3 cm | 10.6 cm | 10.0 cm | 14.8 cm |
+| baseline: constant velocity | 11.7 cm | 22.8 cm | 15.1 cm | 29.9 cm |
+| model, helper only | 7.2 ± 0.4 | 10.2 ± 0.6 | 9.8 ± 0.7 | 14.1 ± 0.8 |
+| model, both, partner shuffled | 7.3 ± 0.4 | 10.3 ± 0.6 | 9.8 ± 0.6 | 14.2 ± 0.8 |
+| model, both, paired | 7.3 ± 0.4 | 10.3 ± 0.6 | 9.8 ± 0.6 | 14.2 ± 0.8 |
+
+Negative result, stated plainly: the model beats "the hand stays where it is" by 4 % and the three input conditions are indistinguishable. A small regression model trained with an L1-type loss on multimodal hand futures collapses to predicting near-zero motion, which is exactly the failure Lawrence described ("the same observation can correspond to multiple valid actions; models overfit to one trajectory"). Hand forecasting needs a multimodal or goal-conditioned output (predict where the hand is going, e.g. toward which object or toward the partner's hand), not a point estimate. The classification results above (helper-action onset 0.73 AUROC) are the useful form of the same question.
 
 ## New result 4: grasp-state proxies as an object-perception stand-in
 
