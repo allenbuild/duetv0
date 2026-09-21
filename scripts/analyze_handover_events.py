@@ -20,7 +20,7 @@ import numpy as np
 from sklearn.metrics import roc_auc_score
 
 FPS = 30
-TASK_IDX = {"handover_active": 0, "onset_within_1s": 1, "onset_within_2s": 2, "ja_active": 3}
+TASK_IDX = None  # resolved from results.json "tasks" (falls back to the v0 order)
 
 
 def smooth(p, k=9):
@@ -34,7 +34,9 @@ def main():
     ap.add_argument("--out", default="outputs/paired_benchmark/event_analysis.json")
     ap.add_argument("--task", default="onset_within_2s")
     a = ap.parse_args()
-    ti = TASK_IDX[a.task]
+    info = json.load(open(Path(a.result_dirs[0]) / "results.json"))["info"]
+    tasks = info.get("tasks", ["handover_active", "onset_within_1s", "onset_within_2s", "ja_active"])
+    ti = tasks.index(a.task)
     preds = defaultdict(dict)  # view -> rid8 -> probs
     for d in a.result_dirs:
         for p in Path(d).glob("preds_*.npz"):

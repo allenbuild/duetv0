@@ -101,14 +101,14 @@ def time_to_next_onset(n: int, onsets, max_s: float) -> np.ndarray:
     return out
 
 
-def build_frame_labels(annotations_dir: Path, recording_id: str, n: int, horizons_s=(1.0, 2.0, 3.0)) -> dict:
+def build_frame_labels(annotations_dir: Path, recording_id: str, n: int, horizons_s=(1.0, 2.0, 3.0, 5.0)) -> dict:
     hos = load_handovers(annotations_dir, recording_id)
     ja = load_joint_attention_intervals(annotations_dir, recording_id)
     onsets = [e.start_frame for e in hos if 0 <= e.start_frame < n]
     labels = {
         "handover_active": interval_mask(n, [(e.start_frame, e.end_frame) for e in hos]),
         "ja_active": interval_mask(n, [(s, e) for s, e, _ in ja]),
-        "tth_s": time_to_next_onset(n, onsets, max_s=5.0),
+        "tth_s": time_to_next_onset(n, onsets, max_s=8.0),
     }
     for h in horizons_s:
         labels[f"onset_within_{h:g}s"] = onset_within(n, onsets, int(round(h * FPS)))

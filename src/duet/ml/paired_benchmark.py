@@ -38,7 +38,14 @@ from torch import nn
 
 from duet.adapters.comind.kinematics import PERSON_DIM
 
-CLS_TASKS = ("handover_active", "onset_within_1s", "onset_within_2s", "ja_active")
+CLS_TASKS = ("handover_active", "onset_within_2s", "onset_within_5s", "ja_active")
+ALL_LABELS = ("handover_active", "onset_within_1s", "onset_within_2s", "onset_within_3s", "onset_within_5s", "ja_active")
+
+
+def set_tasks(tasks) -> None:
+    """Override the classification task set (module-global, read at call time by every function here)."""
+    global CLS_TASKS
+    CLS_TASKS = tuple(tasks)
 REG_TASK = "tth_s"
 VIEWS = ("leader", "helper", "both", "both_shuffled")
 FPS = 30
@@ -65,7 +72,7 @@ def load_recordings(proc_root: Path, ids: list[str]) -> list[Recording]:
             continue
         z = np.load(p)
         meta = json.load(open(proc_root / rid / "kinematics_v0.json"))
-        y = {k: z[k] for k in CLS_TASKS + (REG_TASK,)}
+        y = {k: z[k] for k in tuple(k for k in ALL_LABELS if k in z.files) + (REG_TASK,)}
         sp = proc_root / rid / "speech_v0.npz"
         speech = np.load(sp)["speech"] if sp.exists() else None
         wp = proc_root / rid / "world_v0.npz"
@@ -156,12 +163,12 @@ class CausalBlock(nn.Module):
 class CausalTCN(nn.Module):
     """Dilated causal TCN; receptive field = 1 + sum(2*(k-1)*d) ~ 253 frames (8.4 s)."""
 
-    def __init__(self, d_in: int, c: int = 128, dilations=(1, 2, 4, 8, 16, 32), n_cls: int = len(CLS_TASKS), dropout: float = 0.1):
+    def __init__(self, d_in: int, c: int = 128, dilations=(1, 2, 4, 8, 16, 32), n_cls: int | None = None, dropout: float = 0.1):
         super().__init__()
         self.inp = nn.Conv1d(d_in, c, 1)
         self.in_drop = nn.Dropout(dropout)
         self.blocks = nn.ModuleList([CausalBlock(c, d, p=dropout) for d in dilations])
-        self.cls_head = nn.Conv1d(c, n_cls, 1)
+        self.cls_head = nn.Conv1d(c, n_cls or len(CLS_TASKS), 1)
         self.reg_head = nn.Conv1d(c, 1, 1)
 
     def forward(self, x):  # x [B, T, D]
@@ -186,7 +193,7 @@ class TrainConfig:
     # v1 recipe: fraction of training crops forced to contain a handover onset, per-task loss weights,
     # and the cap on the positive-class weight (handover frames are ~0.5% of data).
     onset_crop_frac: float = 0.0
-    task_weights: tuple = (1.0, 1.0, 1.0, 1.0)
+    task_weights: tuple = ()  # empty = all ones
     pos_weight_cap: float = 20.0
     dropout: float = 0.1
     use_speech: bool = False
@@ -251,9 +258,9 @@ def evaluate(model, recs, view, norm, cfg, rng, want_preds=False):
         for i, t in enumerate(CLS_TASKS):
             probs[t].append(p[valid, i])
             ys[t].append(r.y[t][valid])
-        m = np.isfinite(r.y[REG_TASK]) & (r.y[REG_TASK] <= 3.0) & valid
+        m = np.isfinite(r.y[REG_TASK]) & (r.y[REG_TASK] <= 5.0) & valid
         if m.any():
-            tth_err.append(np.abs(np.clip(reg[m], 0, 5) - r.y[REG_TASK][m]))
+            tth_err.append(np.abs(np.clip(reg[m], 0, 8) - r.y[REG_TASK][m]))
         if want_preds:
             preds[r.rid] = {"probs": p.astype(np.float16), "tth": reg.astype(np.float16)}
     out = {}
@@ -281,7 +288,7 @@ def train_view(train_recs, val_recs, test_recs, view: str, cfg: TrainConfig, log
     opt = torch.optim.AdamW(model.parameters(), lr=cfg.lr, weight_decay=1e-2)
     sched = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=cfg.lr, total_steps=cfg.steps, pct_start=0.1)
     pos_w = _pos_weights(train_recs, cfg.pos_weight_cap).to(cfg.device)
-    task_w = torch.tensor(cfg.task_weights, dtype=torch.float32, device=cfg.device)
+    task_w = torch.tensor(cfg.task_weights or (1.0,) * len(CLS_TASKS), dtype=torch.float32, device=cfg.device)
     onset_recs = [r for r in train_recs if r.handover_onsets]
     best, best_state, t0 = -1.0, None, time.time()
     for step in range(1, cfg.steps + 1):

@@ -27,8 +27,8 @@ from duet.ml.paired_benchmark import CLS_TASKS, FPS, REG_TASK
 VIEW_LABEL = {"leader": "leader only", "helper": "helper only", "both": "both (paired)", "both_shuffled": "both (partner shuffled)"}
 TICK_LABEL = {"leader": "leader\nonly", "helper": "helper\nonly", "both": "both\n(paired)", "both_shuffled": "both\n(shuffled)"}
 VIEW_COLOR = {"leader": "#8da0cb", "helper": "#fc8d62", "both": "#1b9e77", "both_shuffled": "#999999"}
-TASK_LABEL = {"handover_active": "handover in progress", "onset_within_1s": "handover starts in <1 s",
-              "onset_within_2s": "handover starts in <2 s", "ja_active": "joint attention now"}
+TASK_LABEL = {"handover_active": "handover in progress", "onset_within_1s": "handover starts in <1 s", "onset_within_2s": "handover starts in <2 s",
+              "onset_within_3s": "handover starts in <3 s", "onset_within_5s": "handover starts in <5 s", "ja_active": "joint attention now"}
 
 
 def load_results(dirs):
@@ -133,6 +133,8 @@ def main():
     a = ap.parse_args()
     out = Path(a.out); out.mkdir(parents=True, exist_ok=True)
     pooled, per_fold, info = load_results(a.result_dirs)
+    global CLS_TASKS
+    CLS_TASKS = tuple(info.get("tasks", CLS_TASKS)); pb.set_tasks(CLS_TASKS)
     fig_results(pooled, per_fold, info, out)
     rid = a.demo_recording
     preds = {}

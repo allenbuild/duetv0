@@ -23,8 +23,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 from sklearn.metrics import average_precision_score, roc_auc_score
 
+import duet.ml.paired_benchmark as pb
 from duet.ml.paired_benchmark import (
-    CLS_TASKS,
     FPS,
     REG_TASK,
     VIEWS,
@@ -47,6 +47,7 @@ def official_split() -> tuple[list[str], list[str]]:
 
 
 def pooled_metrics(pool):
+    CLS_TASKS = pb.CLS_TASKS
     out = {}
     for t in CLS_TASKS:
         y = np.concatenate(pool[t]["y"]); p = np.concatenate(pool[t]["p"])
@@ -69,14 +70,17 @@ def main() -> None:
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--demo-recording", default="43276420-701f-4731-b9ab-bebc7fd14994")
     ap.add_argument("--onset-crop-frac", type=float, default=0.0, help="fraction of training crops forced to contain a handover onset")
-    ap.add_argument("--task-weights", default="1,1,1,1", help="loss weights for handover_active,onset_1s,onset_2s,ja_active")
+    ap.add_argument("--task-weights", default="", help="comma-separated loss weights, one per task (default all 1)")
     ap.add_argument("--pos-weight-cap", type=float, default=20.0)
     ap.add_argument("--dropout", type=float, default=0.1)
     ap.add_argument("--speech", action="store_true", help="append per-person speech features from transcripts")
     ap.add_argument("--world", action="store_true", help="append cross-person shared-world block to the paired view; restricts to recordings that have it")
     ap.add_argument("--world-subset", action="store_true", help="restrict to recordings with world features without using them (control)")
+    ap.add_argument("--tasks", default=",".join(pb.CLS_TASKS), help="comma-separated classification tasks (label names in kinematics_v0.npz)")
     ap.add_argument("--select-metric", default="mean_auroc", choices=["mean_auroc", "mean_ap"])
     a = ap.parse_args()
+    pb.set_tasks(a.tasks.split(","))
+    CLS_TASKS = pb.CLS_TASKS
     out = Path(a.out); out.mkdir(parents=True, exist_ok=True)
     train_ids, _ = official_split()
     recs = load_recordings(Path(a.proc_root), train_ids)
@@ -87,7 +91,7 @@ def main() -> None:
     folds = [sorted(order[i::a.folds].tolist()) for i in range(a.folds)]
     info = {"n_recordings": len(recs), "hours": sum(len(r.x) for r in recs) / FPS / 3600,
             "handovers": sum(len(r.handover_onsets) for r in recs), "folds": a.folds, "steps": a.steps,
-            "device": TrainConfig().device, "onset_crop_frac": a.onset_crop_frac, "task_weights": a.task_weights, "pos_weight_cap": a.pos_weight_cap, "dropout": a.dropout, "channels": a.channels, "speech": a.speech, "world": a.world, "select_metric": a.select_metric, "recording_ids": [r.rid for r in recs]}
+            "device": TrainConfig().device, "onset_crop_frac": a.onset_crop_frac, "task_weights": a.task_weights, "pos_weight_cap": a.pos_weight_cap, "dropout": a.dropout, "channels": a.channels, "speech": a.speech, "world": a.world, "select_metric": a.select_metric, "tasks": list(CLS_TASKS), "recording_ids": [r.rid for r in recs]}
     print(json.dumps({k: v for k, v in info.items() if k != "recording_ids"}, indent=1), flush=True)
     log_f = open(out / "train.log", "a")
 
@@ -102,7 +106,7 @@ def main() -> None:
             va = [recs[i] for i in folds[(k + 1) % a.folds]]
             tr = [recs[i] for j in range(a.folds) if j not in (k, (k + 1) % a.folds) for i in folds[j]]
             cfg = TrainConfig(steps=a.steps, eval_every=a.eval_every, channels=a.channels, seed=a.seed * 100 + k,
-                              onset_crop_frac=a.onset_crop_frac, task_weights=tuple(float(v) for v in a.task_weights.split(",")),
+                              onset_crop_frac=a.onset_crop_frac, task_weights=tuple(float(v) for v in a.task_weights.split(",")) if a.task_weights else (),
                               pos_weight_cap=a.pos_weight_cap, dropout=a.dropout, use_speech=a.speech, use_world=a.world, select_metric=a.select_metric)
             t0 = time.time()
             res, _, model, norm = train_view(tr, va, te, view, cfg, log=log)
@@ -116,8 +120,8 @@ def main() -> None:
                 valid = np.ones(len(r.x), bool); valid[: 2 * FPS] = False
                 for i, t in enumerate(CLS_TASKS):
                     pool[t]["y"].append(r.y[t][valid]); pool[t]["p"].append(p[valid, i])
-                m = np.isfinite(r.y[REG_TASK]) & (r.y[REG_TASK] <= 3.0) & valid
-                pool[REG_TASK].append(np.abs(np.clip(reg[m], 0, 5) - r.y[REG_TASK][m]))
+                m = np.isfinite(r.y[REG_TASK]) & (r.y[REG_TASK] <= 5.0) & valid
+                pool[REG_TASK].append(np.abs(np.clip(reg[m], 0, 8) - r.y[REG_TASK][m]))
                 np.savez_compressed(out / f"preds_{view}_{r.rid[:8]}.npz", probs=p.astype(np.float16), tth=reg.astype(np.float16))
             torch.save({"state": model.state_dict(), "norm_mean": norm.mean, "norm_std": norm.std, "cfg": cfg.__dict__, "view": view, "d_in": res["d_in"]},
                        out / f"model_{view}_k{k}.pt")
