@@ -101,6 +101,16 @@ def time_to_next_onset(n: int, onsets, max_s: float) -> np.ndarray:
     return out
 
 
+def time_to_completion(n: int, intervals) -> np.ndarray:
+    """Seconds until the handover interval ends, defined only for frames inside [start, end]; NaN elsewhere."""
+    out = np.full(n, np.nan, dtype=np.float32)
+    for s, e in intervals:
+        s, e = max(0, s), min(n - 1, e)
+        if e >= s:
+            out[s : e + 1] = (e - np.arange(s, e + 1)) / FPS
+    return out
+
+
 def build_frame_labels(annotations_dir: Path, recording_id: str, n: int, horizons_s=(1.0, 2.0, 3.0, 5.0)) -> dict:
     hos = load_handovers(annotations_dir, recording_id)
     ja = load_joint_attention_intervals(annotations_dir, recording_id)
@@ -109,6 +119,7 @@ def build_frame_labels(annotations_dir: Path, recording_id: str, n: int, horizon
         "handover_active": interval_mask(n, [(e.start_frame, e.end_frame) for e in hos]),
         "ja_active": interval_mask(n, [(s, e) for s, e, _ in ja]),
         "tth_s": time_to_next_onset(n, onsets, max_s=8.0),
+        "tte_s": time_to_completion(n, [(e.start_frame, e.end_frame) for e in hos]),
     }
     for h in horizons_s:
         labels[f"onset_within_{h:g}s"] = onset_within(n, onsets, int(round(h * FPS)))

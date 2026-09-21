@@ -40,6 +40,13 @@ from duet.adapters.comind.kinematics import PERSON_DIM
 
 CLS_TASKS = ("handover_active", "onset_within_2s", "onset_within_5s", "ja_active")
 ALL_LABELS = ("handover_active", "onset_within_1s", "onset_within_2s", "onset_within_3s", "onset_within_5s", "ja_active")
+REG_MAX_S = 8.0
+
+
+def set_reg_task(name: str, max_s: float) -> None:
+    """Choose the regression target: 'tth_s' (time to next onset) or 'tte_s' (time to completion within a handover)."""
+    global REG_TASK, REG_MAX_S
+    REG_TASK, REG_MAX_S = name, max_s
 
 
 def set_tasks(tasks) -> None:
@@ -64,7 +71,8 @@ class Recording:
     w: np.ndarray | None = None  # [N, WORLD_DIM] optional cross-person shared-world block
 
 
-def load_recordings(proc_root: Path, ids: list[str]) -> list[Recording]:
+def load_recordings(proc_root: Path, ids: list[str], speech_source: str = "hashed") -> list[Recording]:
+    """speech_source: 'hashed' (speech_v0.npz), 'emb' (speech_emb_v0.npz) or 'both' (concatenated per person)."""
     out = []
     for rid in ids:
         p = proc_root / rid / "kinematics_v0.npz"
@@ -72,13 +80,24 @@ def load_recordings(proc_root: Path, ids: list[str]) -> list[Recording]:
             continue
         z = np.load(p)
         meta = json.load(open(proc_root / rid / "kinematics_v0.json"))
-        y = {k: z[k] for k in tuple(k for k in ALL_LABELS if k in z.files) + (REG_TASK,)}
-        sp = proc_root / rid / "speech_v0.npz"
-        speech = np.load(sp)["speech"] if sp.exists() else None
+        y = {k: z[k] for k in tuple(k for k in ALL_LABELS + ("tth_s", "tte_s") if k in z.files)}
+        speech = _load_speech(proc_root / rid, speech_source)
         wp = proc_root / rid / "world_v0.npz"
         world = np.load(wp)["world"] if wp.exists() else None
         out.append(Recording(rid, z["features"], y, [h["start_frame"] for h in meta["handovers"]], speech, world))
     return out
+
+
+def _load_speech(d: Path, source: str):
+    files = {"hashed": ["speech_v0.npz"], "emb": ["speech_emb_v0.npz"], "both": ["speech_v0.npz", "speech_emb_v0.npz"]}[source]
+    blocks = [np.load(d / f)["speech"] for f in files if (d / f).exists()]
+    if len(blocks) != len(files):
+        return None
+    if len(blocks) == 1:
+        return blocks[0]
+    # keep per-person layout: [leader_a, leader_b, helper_a, helper_b]
+    halves = [(b[:, : b.shape[1] // 2], b[:, b.shape[1] // 2 :]) for b in blocks]
+    return np.concatenate([h[0] for h in halves] + [h[1] for h in halves], axis=1)
 
 
 def view_input(x: np.ndarray, view: str, rng: np.random.Generator | None, speech: np.ndarray | None = None,
@@ -245,6 +264,13 @@ def predict(model, x_np: np.ndarray, cfg: TrainConfig) -> tuple[np.ndarray, np.n
     return torch.sigmoid(logits)[0].cpu().numpy(), reg[0].cpu().numpy()
 
 
+def _reg_baseline_mae(recs, valid_from: int) -> float:
+    """MAE of predicting the constant median target (what a model that ignores its input achieves)."""
+    ys = np.concatenate([r.y[REG_TASK][valid_from:] for r in recs])
+    ys = ys[np.isfinite(ys) & (ys <= REG_MAX_S)]
+    return float(np.abs(ys - np.median(ys)).mean()) if ys.size else float("nan")
+
+
 def evaluate(model, recs, view, norm, cfg, rng, want_preds=False):
     """Frame-level AP / AUROC per task on full sequences; TTH MAE on frames with tth<=3s."""
     probs = {t: [] for t in CLS_TASKS}
@@ -258,9 +284,9 @@ def evaluate(model, recs, view, norm, cfg, rng, want_preds=False):
         for i, t in enumerate(CLS_TASKS):
             probs[t].append(p[valid, i])
             ys[t].append(r.y[t][valid])
-        m = np.isfinite(r.y[REG_TASK]) & (r.y[REG_TASK] <= 5.0) & valid
+        m = np.isfinite(r.y[REG_TASK]) & (r.y[REG_TASK] <= REG_MAX_S) & valid
         if m.any():
-            tth_err.append(np.abs(np.clip(reg[m], 0, 8) - r.y[REG_TASK][m]))
+            tth_err.append(np.abs(np.clip(reg[m], 0, REG_MAX_S) - r.y[REG_TASK][m]))
         if want_preds:
             preds[r.rid] = {"probs": p.astype(np.float16), "tth": reg.astype(np.float16)}
     out = {}
@@ -272,7 +298,8 @@ def evaluate(model, recs, view, norm, cfg, rng, want_preds=False):
             "auroc": float(roc_auc_score(y, p)) if 0 < y.sum() < len(y) else float("nan"),
             "prevalence": float(y.mean()),
         }
-    out[REG_TASK] = {"mae_s": float(np.concatenate(tth_err).mean()) if tth_err else float("nan")}
+    out[REG_TASK] = {"mae_s": float(np.concatenate(tth_err).mean()) if tth_err else float("nan"),
+                     "baseline_mae_s": _reg_baseline_mae(recs, valid_from=2 * FPS)}
     out["_summary_ap"] = float(np.nanmean([out[t]["ap"] for t in CLS_TASKS]))
     out["_summary_auroc"] = float(np.nanmean([out[t]["auroc"] for t in CLS_TASKS]))
     return (out, preds) if want_preds else out
