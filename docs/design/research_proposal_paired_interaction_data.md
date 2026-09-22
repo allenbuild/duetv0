@@ -22,7 +22,7 @@ Per-event quality metrics, computed from kinematics alone (no annotation beyond 
 
 These map directly onto the operator product (waiting, hand-offs, coordination breakdowns) and onto what a robot policy must reproduce.
 
-## 3. What is already measured (CoMind, ETH Zurich; 44 annotated pairs, 21 h, 248 handovers, 986 helper actions)
+## 3. What is already measured (CoMind, ETH Zurich; 44 annotated pairs, 21 h, 248 handovers, 756 helper actions)
 
 Sensors: two Meta Aria headsets, hardware time-synchronised; onboard 3D hand tracking, gaze, head SLAM; Multi-SLAM shared world for 36 pairs. No pixels are used by any model below. Evaluation: recording-level 5-fold cross-validation; no pair is ever seen in training.
 
@@ -35,7 +35,7 @@ The ablation Sebastian asked for, with a de-synchronised control (partner stream
 | handover starts within 5 s | 0.589 | 0.574 | **0.609** |
 | helper's next action starts within 2 s, from the **leader's** body alone | 0.697 | (pending) | (pending) |
 
-Adding shared-world geometry (both people's hands and gaze in one frame) raises joint attention from 0.646 to 0.729 on the 11 labelled pairs that have it. Kinematic collaboration metrics: receivers begin moving before the giver's reach in 67 % of measurable handovers, a median 0.6 s early; verbal cues shorten receiver latency relative to implicit ones; hands meet at 3 cm median separation at transfer.
+Adding shared-world geometry (both people's hands and gaze in one frame) raises joint attention from 0.646 to 0.729 on the 11 labelled pairs that have it. Kinematic collaboration metrics: receivers begin moving before the giver's reach in 44 % of measurable handovers (median response +0.17 s), i.e. no systematic anticipation once giver and receiver onsets are detected with identical search windows; wrist-speed synchrony is 0.52 [0.36, 0.73]; hands meet at 3 cm median separation at transfer.
 
 What does not work yet: anticipating a handover seconds before it starts is weak for every model and feature set (best 0.61). The cue is what is said and what is looked at; neither noisy kitchen ASR nor gaze without object positions resolves it. ETH's own video-language baselines score 13 % on time-to-handover.
 
