@@ -7,13 +7,32 @@ the *interaction* (temporal correspondence) rather than just extra input?
 
 Views
 -----
-- ``leader``       : leader's own hands + gaze
-- ``helper``       : helper's own hands + gaze
-- ``both``         : both streams, time-aligned
-- ``both_shuffled``: both streams, but the partner stream is circularly shifted by
-                     >= 60 s within the same recording. Marginal statistics are
-                     identical to ``both``; only the interaction is destroyed.
-                     If ``both`` beats ``both_shuffled`` the gain is interaction.
+- ``leader``         : leader's own hands + gaze
+- ``helper``         : helper's own hands + gaze
+- ``both``           : both streams, time-aligned
+- ``both_shuffled``  : both streams, helper circularly shifted by >= 60 s within the
+                       same recording.
+- ``leader_shuffled``: the mirror control, leader shifted and helper kept aligned.
+
+What the shuffled controls do and do not establish
+--------------------------------------------------
+Rolling one stream destroys its alignment with the partner AND with the labels, so the
+shuffled model's best strategy is to ignore the rolled person entirely; its expected
+score is the un-rolled person's single-view score. That rules out "the gain is just more
+input columns" (same width, same marginals) but it does NOT distinguish
+
+  (a) two independently informative streams being averaged, from
+  (b) the temporal correspondence between them carrying information neither has alone.
+
+Only (b) is an "interaction" claim. ``late_fusion`` in scripts/compare_view_controls.py
+separates them: it combines the held-out probabilities of the two single-view models, so
+it has both streams' marginal information but no access to their correspondence. A paired
+model that beats late fusion is using the interaction; one that merely matches it is doing
+(a). Report both controls; quote the interaction claim only against late fusion.
+
+Both controls are always reported against the *better* single view, since rolling the
+more informative partner flatters the control (for joint attention the helper is the
+stronger single view, so ``both_shuffled`` deletes the better signal).
 
 Tasks (per-frame, causal: the model sees only the past)
 ------
@@ -25,6 +44,7 @@ Tasks (per-frame, causal: the model sees only the past)
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import time
 from dataclasses import dataclass, field
@@ -55,7 +75,7 @@ def set_tasks(tasks) -> None:
     global CLS_TASKS
     CLS_TASKS = tuple(tasks)
 REG_TASK = "tth_s"
-VIEWS = ("leader", "helper", "both", "both_shuffled")
+VIEWS = ("leader", "helper", "both", "both_shuffled", "leader_shuffled")
 FPS = 30
 SHUFFLE_MIN_SHIFT = 60 * FPS
 
@@ -101,12 +121,28 @@ def _load_speech(d: Path, source: str):
     return np.concatenate([h[0] for h in halves] + [h[1] for h in halves], axis=1)
 
 
+def shuffle_shift(n: int, rid: str | None, rng: np.random.Generator | None) -> int:
+    """Circular shift for a shuffled control, stable across calls for a given recording.
+
+    The shift must be identical in the training cache, the normaliser, and every
+    evaluation pass, otherwise the control sees a different roll each time it is used.
+    Deriving it from the recording id makes it reproducible across processes too
+    (``hash()`` is salted per interpreter and must not be used for this).
+    """
+    hi = max(SHUFFLE_MIN_SHIFT + 1, n - SHUFFLE_MIN_SHIFT)
+    if rid is not None:
+        seed = int.from_bytes(hashlib.sha256(rid.encode()).digest()[:8], "big")
+        rng = np.random.default_rng(seed)
+    return int((rng or np.random.default_rng(0)).integers(SHUFFLE_MIN_SHIFT, hi))
+
+
 def view_input(x: np.ndarray, view: str, rng: np.random.Generator | None, speech: np.ndarray | None = None,
-               world: np.ndarray | None = None) -> np.ndarray:
+               world: np.ndarray | None = None, rid: str | None = None) -> np.ndarray:
     """Select the input block(s) for a view. Returns [N, D_view].
 
     If ``speech`` is given, each person's speech block is appended to that person's
-    kinematics block (and shuffled together with it for ``both_shuffled``).
+    kinematics block (and shuffled together with it in the shuffled controls).
+    ``rid`` makes the shuffled controls' roll deterministic; see ``shuffle_shift``.
     """
     L = x[:, :PERSON_DIM]
     H = x[:, PERSON_DIM:]
@@ -121,11 +157,11 @@ def view_input(x: np.ndarray, view: str, rng: np.random.Generator | None, speech
     if view == "both":
         blocks = [L, H] + ([world] if world is not None else [])
         return np.concatenate(blocks, axis=1)
-    if view == "both_shuffled":
-        n = len(x)
-        rng = rng or np.random.default_rng(0)
-        shift = int(rng.integers(SHUFFLE_MIN_SHIFT, max(SHUFFLE_MIN_SHIFT + 1, n - SHUFFLE_MIN_SHIFT)))
-        return np.concatenate([L, np.roll(H, shift, axis=0)], axis=1)
+    if view in ("both_shuffled", "leader_shuffled"):
+        shift = shuffle_shift(len(x), rid, rng)
+        if view == "both_shuffled":  # helper rolled, leader stays aligned with the labels
+            return np.concatenate([L, np.roll(H, shift, axis=0)], axis=1)
+        return np.concatenate([np.roll(L, shift, axis=0), H], axis=1)
     raise ValueError(view)
 
 
@@ -254,7 +290,7 @@ def _sample_batch(recs, view, norm, cfg, rng, cache, onset_recs=()):
 
 
 def _build_cache(recs, view, norm, rng, cfg):
-    return {(r.rid, view): norm(view_input(r.x, view, rng, r.s if cfg.use_speech else None, r.w if cfg.use_world else None)).astype(np.float32) for r in recs}
+    return {(r.rid, view): norm(view_input(r.x, view, rng, r.s if cfg.use_speech else None, r.w if cfg.use_world else None, rid=r.rid)).astype(np.float32) for r in recs}
 
 
 @torch.no_grad()
@@ -278,7 +314,7 @@ def evaluate(model, recs, view, norm, cfg, rng, want_preds=False):
     ys = {t: [] for t in CLS_TASKS}
     tth_err, preds = [], {}
     for r in recs:
-        p, reg = predict(model, norm(view_input(r.x, view, rng, r.s if cfg.use_speech else None, r.w if cfg.use_world else None)), cfg)
+        p, reg = predict(model, norm(view_input(r.x, view, rng, r.s if cfg.use_speech else None, r.w if cfg.use_world else None, rid=r.rid)), cfg)
         # ignore the first 2 s (model warm-up) and frames where both people's hands+gaze are absent
         valid = np.ones(len(r.x), bool)
         valid[: 2 * FPS] = False
@@ -309,7 +345,7 @@ def evaluate(model, recs, view, norm, cfg, rng, want_preds=False):
 def train_view(train_recs, val_recs, test_recs, view: str, cfg: TrainConfig, log=print, want_preds_for=()):
     torch.manual_seed(cfg.seed)
     rng = np.random.default_rng(cfg.seed)
-    norm = Normalizer([view_input(r.x, view, rng, r.s if cfg.use_speech else None, r.w if cfg.use_world else None) for r in train_recs])
+    norm = Normalizer([view_input(r.x, view, rng, r.s if cfg.use_speech else None, r.w if cfg.use_world else None, rid=r.rid) for r in train_recs])
     cache = _build_cache(train_recs, view, norm, rng, cfg)
     d_in = 2 * next(iter(cache.values())).shape[1]
     model = CausalTCN(d_in, c=cfg.channels, dropout=cfg.dropout).to(cfg.device)

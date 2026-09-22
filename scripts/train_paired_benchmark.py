@@ -122,7 +122,7 @@ def main() -> None:
                 + f" tthMAE={res['test'][REG_TASK]['mae_s']:.2f}s ({time.time()-t0:.0f}s)")
             # pool held-out predictions
             for r in te:
-                p, reg = predict(model, norm(view_input(r.x, view, np.random.default_rng(321), r.s if cfg.use_speech else None, r.w if cfg.use_world else None)), cfg)
+                p, reg = predict(model, norm(view_input(r.x, view, np.random.default_rng(321), r.s if cfg.use_speech else None, r.w if cfg.use_world else None, rid=r.rid)), cfg)
                 valid = np.ones(len(r.x), bool); valid[: 2 * FPS] = False
                 for i, t in enumerate(CLS_TASKS):
                     pool[t]["y"].append(r.y[t][valid]); pool[t]["p"].append(p[valid, i])
