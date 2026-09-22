@@ -7,7 +7,10 @@ labels (approach / transfer / retract). Both are derived here from the kinematic
   giver_reach_onset_s   first frame after the annotated start where the giver's wrist speed exceeds
                         its pre-onset baseline + 2 sd for >= 5 frames (approach begins)
   receiver_response_s   same for the receiver, measured from the giver's reach onset (reaction latency;
-                        negative = receiver moved first, i.e. anticipated)
+                        negative = receiver moved first, i.e. anticipated). Both onsets are
+                        detected with IDENTICAL search windows (see SEARCH_LEAD); an earlier
+                        version searched the receiver 1 s earlier than the giver, which forced
+                        the sign negative whenever both moved before the annotated start.
   transfer_s            frame of minimum giver-receiver wrist distance (shared world frame, where available),
                         else the giver's speed minimum after the reach peak (own frame)
   giver_hold_s          time the giver's wrist is extended and nearly still before transfer (waiting)
@@ -25,6 +28,10 @@ import numpy as np, pandas as pd
 ROOT = Path(__file__).resolve().parents[1]; sys.path.insert(0, str(ROOT / "src"))
 from duet.adapters.comind.kinematics import HAND_DIM, person_slice
 FPS = 30
+# Symmetric onset-search geometry, applied identically to giver and receiver.
+SEARCH_LEAD = int(1.5 * FPS)   # start searching this far BEFORE the annotated start
+BASELINE = 3 * FPS             # rest-speed baseline window preceding the search start
+SEARCH_AHEAD = 6 * FPS         # how far forward a reach onset may be found
 
 def wrist_speed(f, role):
     s = person_slice(role); best = np.zeros(len(f)); anyv = np.zeros(len(f), bool)
@@ -54,11 +61,19 @@ for j in sorted((ROOT / "data/processed/comind").glob("*/kinematics_v0.json")):
     stages = np.zeros(n, np.int8)
     for h in m["handovers"]:
         s0, e0 = h["start_frame"], h["end_frame"]
-        if s0 < 6 * FPS or e0 >= n: continue
+        if s0 < SEARCH_LEAD + BASELINE + FPS or e0 >= n: continue
         giver, recv = ("leader", "helper") if h["flow_leader_to_helper"] else ("helper", "leader")
         gs, rs = spd[giver][0], spd[recv][0]
-        g_on = onset_after(gs, s0, s0 - 3 * FPS, s0)
-        r_on = onset_after(rs, s0 - FPS, s0 - 4 * FPS, s0 - FPS, max_ahead=5 * FPS)  # may precede the giver's reach (anticipation)
+        # SYMMETRIC detection windows. Searching the giver from s0 but the receiver from
+        # s0-1s biases receiver_response_s negative by construction: if BOTH people began
+        # moving before the annotator's start mark, the giver's onset is clamped to >= s0
+        # while the receiver's is found earlier, manufacturing "the receiver moved first".
+        # Both are now searched from the same frame with the same baseline and lookahead,
+        # so a negative latency is a measurement rather than an artefact of the window.
+        search_from = s0 - SEARCH_LEAD
+        base_lo, base_hi = s0 - SEARCH_LEAD - BASELINE, s0 - SEARCH_LEAD
+        g_on = onset_after(gs, search_from, base_lo, base_hi, max_ahead=SEARCH_AHEAD)
+        r_on = onset_after(rs, search_from, base_lo, base_hi, max_ahead=SEARCH_AHEAD)
         # transfer: min inter-wrist distance in shared world if available, else giver speed minimum after its peak
         if world is not None and world[s0: e0 + 1, 4].max() > 0:
             dmin = np.where(world[s0: e0 + 1, 4] > 0, world[s0: e0 + 1, 4], np.inf); t_tr = s0 + int(np.argmin(dmin)); d_tr = float(dmin.min())
