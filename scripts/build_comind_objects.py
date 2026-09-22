@@ -47,10 +47,43 @@ NAME2CAT = {n: CATS.index(c) for c in CATS for n in VOCAB[c]}
 OBJ_DIM = 2 * (len(CATS) + 1) + (len(CATS) + 2) + 3
 
 
+def mp4_complete(mp4: Path) -> bool:
+    """CoMind MP4s put the moov atom at the end; a partially downloaded file has none."""
+    try:
+        with open(mp4, "rb") as f:
+            f.seek(max(0, mp4.stat().st_size - 12_000_000)); return b"moov" in f.read()
+    except OSError:
+        return False
+
+
 def extract_frames(mp4: Path, out_dir: Path) -> list[Path]:
     subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-hwaccel", "videotoolbox", "-i", str(mp4),
                     "-vf", f"fps={DET_FPS},scale={IMG}:{IMG}", "-q:v", "4", str(out_dir / "%06d.jpg")], check=True)
     return sorted(out_dir.glob("*.jpg"))
+
+
+def find_calibration(rec: Path, role: str) -> Path | None:
+    """Standard MPS calibration, else the Multi-SLAM copy (same device, same clock)."""
+    cands = [rec / f"mps_{role}_trimmed_vrs/slam/online_calibration.jsonl", rec / f"mps_{role}_gapfill_vrs/slam/online_calibration.jsonl",
+             rec / f"multislam_output/{role}_trimmed/slam/online_calibration.jsonl"]
+    vmap = rec / "multislam_output/vrs_to_multi_slam.json"
+    if vmap.exists():
+        import json
+        for k, v in json.load(open(vmap)).items():
+            if k.endswith(f"{role}_trimmed.vrs"):
+                cands.append(rec / f"multislam_output/{v}/slam/online_calibration.jsonl")
+    for c in cands:
+        if c.exists() and c.stat().st_size > 50_000_000:
+            return c
+    # Fallback: no calibration exported for this participant. Aria RGB intrinsics/extrinsics are near-identical
+    # across units, and association here is box containment at 640 px, so use the partner's calibration from the
+    # same recording, else a nominal one. Timestamps are ignored in that case (nearest record is arbitrary).
+    other = "helper" if role == "leader" else "leader"
+    for c in [rec / f"mps_{other}_trimmed_vrs/slam/online_calibration.jsonl", rec / f"mps_{other}_gapfill_vrs/slam/online_calibration.jsonl",
+              ROOT / "data/raw/comind/recordings/43276420-701f-4731-b9ab-bebc7fd14994/mps_leader_trimmed_vrs/slam/online_calibration.jsonl"]:
+        if c.exists() and c.stat().st_size > 50_000_000:
+            return c
+    return None
 
 
 def load_rgb_calibs(path: Path):
@@ -76,8 +109,8 @@ def project_points(rgb_calib, pts_device: np.ndarray) -> np.ndarray:
 def build_role(rec: Path, proc: Path, role: str, feats: np.ndarray, model, tmp: Path, log) -> np.ndarray:
     n = len(feats)
     out = np.zeros((n, OBJ_DIM), np.float32)
-    mp4 = rec / "mp4s" / f"{role}_trimmed_sync.mp4"; calp = rec / f"mps_{role}_trimmed_vrs/slam/online_calibration.jsonl"
-    if not (mp4.exists() and calp.exists()):
+    mp4 = rec / "mp4s" / f"{role}_trimmed_sync.mp4"; calp = find_calibration(rec, role)
+    if not (mp4.exists() and calp is not None):
         return out
     t0 = time.time()
     frames = extract_frames(mp4, tmp)
@@ -153,13 +186,15 @@ def main():
             i = ("leader", "helper").index(role)
             if prev[:, (i + 1) * OBJ_DIM - 1].max() > 0 and not a.force:
                 continue  # already built for this role
-            mp4 = rec / "mp4s" / f"{role}_trimmed_sync.mp4"; calp = rec / f"mps_{role}_trimmed_vrs/slam/online_calibration.jsonl"
-            if not (mp4.exists() and calp.exists()):
+            mp4 = rec / "mp4s" / f"{role}_trimmed_sync.mp4"; calp = find_calibration(rec, role)
+            if not (mp4.exists() and calp is not None and mp4_complete(mp4)):
                 continue
             log(f"{rid[:8]} {role}")
             tmp = Path(tempfile.mkdtemp(prefix="duet_frames_"))
             try:
                 prev[:, i * OBJ_DIM: (i + 1) * OBJ_DIM] = build_role(rec, proc, role, feats, model, tmp, log); changed = True
+            except Exception as e:  # noqa: BLE001 - keep the batch going; the watcher retries next pass
+                log(f"  {rid[:8]} {role} FAILED: {str(e)[:120]}")
             finally:
                 shutil.rmtree(tmp, ignore_errors=True)
         if changed:
