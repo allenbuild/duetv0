@@ -26,9 +26,9 @@ def gbdt(files, task):
         out.update({v: (r[v][task]["auroc_fold_mean"], r[v][task]["auroc_fold_sd"]) for v in r if task in r[v] and np.isfinite(r[v][task]["auroc_fold_mean"])})
     return out
 
-G = ["outputs/paired_benchmark/baseline_gbdt_speech.json", "outputs/paired_benchmark/baseline_gbdt_speech_h12.json", "outputs/paired_benchmark/baseline_gbdt_speech_shuffled.json"]
+G = ["outputs/paired_benchmark/baseline_gbdt_objects_all44.json"]
 
-SC = ["outputs/paired_benchmark/baseline_gbdt_scoia.json"]
+SC = ["outputs/paired_benchmark/baseline_gbdt_objects_all44.json"]
 panels = [
     ("joint attention now", None, gbdt(G, "ja_active")),
     ("handover in progress", None, gbdt(G, "handover_active")),
@@ -45,5 +45,5 @@ for ax, (title, t, g) in zip(axes, panels):
     ax.set_ylim(0.4, 0.8); ax.set_title(title, fontsize=11); ax.set_ylabel("AUROC (mean ± sd, 5 held-out folds)")
     for i, v in enumerate(vs): ax.text(i, vals[v][0] + vals[v][1] + 0.008, f"{vals[v][0]:.3f}", ha="center", fontsize=9)
     ax.legend(fontsize=8, loc="upper left")
-fig.suptitle("Best model (gradient-boosted trees on causal window features). CoMind, 44 recordings / 21 h / 248 handovers, recording-level CV.\nNo pixels: Aria hand tracking + gaze + transcript speech features. Shuffled = partner stream time-shifted ≥ 60 s (same inputs, interaction destroyed).", fontsize=10)
+fig.suptitle("Best model (gradient-boosted trees on causal window features). CoMind, 44 pairs / 21 h / 248 handovers / 986 helper actions, recording-level CV.\nInputs: Aria hand tracking + gaze + transcript speech + object identity from ego video (what each hand holds, what gaze is on). Shuffled = partner stream time-shifted ≥ 60 s.", fontsize=10)
 fig.tight_layout(); fig.savefig(OUT / "best_models.png", dpi=150); print(OUT / "best_models.png")

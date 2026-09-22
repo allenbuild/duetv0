@@ -45,7 +45,8 @@ for name, d in RUNS:
         lines.append(f"| {name} ({info['n_recordings']} recs) | {v} | " + " | ".join(cells) + " |")
 for f, label in [("outputs/paired_benchmark/baseline_handcrafted.json", "linear (logistic) on wrist-speed features"), ("outputs/paired_benchmark/baseline_gbdt_speech.json", "GBDT on window features + speech"),
                  ("outputs/paired_benchmark/baseline_gbdt_speech_h12.json", "GBDT on window features + speech"), ("outputs/paired_benchmark/baseline_gbdt_speech_shuffled.json", "GBDT on window features + speech"),
-                 ("outputs/paired_benchmark/baseline_gbdt_grasp.json", "GBDT + speech + grasp-state proxies"), ("outputs/paired_benchmark/baseline_gbdt_scoia.json", "GBDT + speech (helper-action tasks)")]:
+                 ("outputs/paired_benchmark/baseline_gbdt_grasp.json", "GBDT + speech + grasp-state proxies"), ("outputs/paired_benchmark/baseline_gbdt_scoia.json", "GBDT + speech (helper-action tasks)"),
+                 ("outputs/paired_benchmark/baseline_gbdt_noobjects_full.json", "GBDT + speech + grasp (44, matched to objects run)"), ("outputs/paired_benchmark/baseline_gbdt_objects_all44.json", "GBDT + speech + grasp + OBJECTS from video")]:
     p = Path(f)
     if not p.exists():
         continue

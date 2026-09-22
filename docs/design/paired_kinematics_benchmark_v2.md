@@ -12,7 +12,7 @@ Date: 2026-09-21. Follows [v0](paired_kinematics_benchmark_v0.md) and [v1](paire
 | helper-as-robot framing: helper anticipates the leader's needs | Kaichen, ETH's own task 2 | done: SCOIA labels, 986 helper actions |
 | shared world frame, partner's hands in my frame | Lawrence | built; limited to 11 labelled pairs (v1) |
 | sub-stage labels inside a handover | Lawrence | done kinematically (approach / transfer / retract), saved as `handover_stages_v0.npz`, not yet human-verified |
-| object pose / hand-object contact | Kaichen, Lawrence, Haoyu | partial: grasp-state proxies from hand landmarks (aperture, fingertip spread); true object perception needs video, next |
+| object pose / hand-object contact | Kaichen, Lawrence, Haoyu | done at category level from ego video (hand-object and gaze-object association, both views, 44 pairs); specific-object tracking across views not done |
 | whole-body pose | Kaichen | not possible from Aria alone; in the capture spec |
 | a written proposal to review | Sebastian | done: `research_proposal_paired_interaction_data.md` |
 | capture spec for our own recordings | all | done: `capture_spec_v0.md` |
@@ -71,6 +71,21 @@ Added per hand: thumb–index aperture, fingertip spread, palm-to-wrist extent (
 | both, paired | 0.637 (0.662) | 0.581 (0.609) | 0.703 (0.719) |
 
 No gain anywhere; every change is inside the fold-to-fold spread. Hand shape does not stand in for object identity. Object perception has to come from the video.
+
+## New result 5: object identity from the ego video
+
+Built `scripts/build_comind_objects.py`: frames at 3 Hz from both ego videos (164 GB downloaded for the 44 pairs), an open-vocabulary detector (YOLO-World) with a 60-word CoMind kitchen vocabulary grouped into 8 categories (a plain COCO detector names only 12 % of CoMind's objects), and the wearer's Aria 3D hand landmarks and gaze point projected into the image through the official online camera calibration. A hand "holds" the box containing ≥ 3 of its 7 keypoints; gaze "is on" the smallest box containing the gaze pixel. Sanity check on the demo recording: across the annotated bowl handover the receiver's holding flag goes 0.33 → 1.00 and the giver's drops after passing the spoon. Twelve participants have no exported calibration; they use the partner's or a nominal Aria calibration (near-identical across units; adequate for box containment at 640 px).
+
+Same 44 pairs, same folds, same trees, with and without the object block (AUROC):
+
+| view | handover in progress | onset < 5 s | helper action < 2 s | joint attention |
+|---|---|---|---|---|
+| leader only, + objects | 0.601 (0.582) | 0.568 (0.571) | 0.708 (0.697) | 0.637 (0.623) |
+| helper only, + objects | 0.645 (0.632) | 0.561 (0.571) | 0.696 (0.694) | 0.689 (0.670) |
+| both, shuffled, + objects | 0.601 (0.597) | 0.558 (0.580) | 0.704 (–) | 0.637 (0.614) |
+| **both, paired, + objects** | **0.666** (0.637) | **0.609** (0.581) | **0.741** (0.728) | **0.732** (0.703) |
+
+(parenthesis = matched run without objects). Object identity lifts the paired model on every task by +0.01 to +0.03 and widens the paired-vs-shuffled gap (joint attention 0.732 vs 0.637; helper action 0.741 vs 0.704). It does **not** move handover-onset anticipation beyond where speech left it (0.609). Category-level "what is held / looked at" is not the missing cue for onsets; the specific object requested probably is, and that needs object tracking across both views in one frame, which is the shared-world problem again.
 
 ## Where handover anticipation stands
 
