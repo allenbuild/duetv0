@@ -55,7 +55,7 @@ SINGLE = ("leader", "helper")
 FUSIONS = ("late_fusion_prob", "late_fusion_rank")
 
 
-def fit_views(recs, tasks, views, seed, folds_k, speech, log):
+def fit_views(recs, tasks, views, seed, folds_k, speech, log, objects=False):
     """Train every view on shared folds. Returns per-recording held-out probabilities.
 
     out[view][task][rid] -> probs on the strided evaluation frames
@@ -75,6 +75,11 @@ def fit_views(recs, tasks, views, seed, folds_k, speech, log):
     for r in recs:
         sp = r.s if speech else None
         X[r.rid] = {role: featurize(person_base(r.x, role, sp))[2 * FPS::STRIDE] for role in SINGLE}
+        if objects:  # per-person object block (objects_v0.npz: what each hand holds, what gaze is on), leader block first
+            op = ROOT / "data/processed/comind" / r.rid / "objects_v0.npz"
+            ob = np.load(op)["objects"] if op.exists() else np.zeros((len(r.x), 62), np.float32)
+            for i, role in enumerate(SINGLE):
+                X[r.rid][role] = np.concatenate([X[r.rid][role], featurize(ob[:, i * 31:(i + 1) * 31].astype(np.float32))[2 * FPS::STRIDE]], axis=1)
 
     y = {t: {r.rid: r.y[t][2 * FPS::STRIDE] for r in recs} for t in tasks}
     out = {v: {t: {} for t in tasks} for v in views}
@@ -196,6 +201,7 @@ def main() -> int:
     ap.add_argument("--seeds", default="0", help="comma-separated fold-partition seeds")
     ap.add_argument("--folds", type=int, default=5)
     ap.add_argument("--speech", action="store_true")
+    ap.add_argument("--objects", action="store_true", help="append per-person object-identity block from objects_v0.npz")
     ap.add_argument("--n-boot", type=int, default=10000)
     ap.add_argument("--proc-root", type=Path, default=ROOT / "data/processed/comind")
     ap.add_argument("--out", type=Path, default=ROOT / "outputs/paired_benchmark/view_controls")
@@ -224,7 +230,7 @@ def main() -> int:
                "n_recordings": len(recs), "per_seed": []}
 
     for seed in seeds:
-        out, y, fold_of = fit_views(recs, tasks, views, seed, a.folds, a.speech, log)
+        out, y, fold_of = fit_views(recs, tasks, views, seed, a.folds, a.speech, log, objects=a.objects)
         for v in FUSIONS:
             out[v] = {t: {} for t in tasks}
         out = add_fusions(out, y, fold_of, tasks, a.folds)
