@@ -29,6 +29,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 from duet.adapters.comind.kinematics import HAND_DIM, KEY_LANDMARKS, frame_device_times_ns, parse_mp4_tail, person_slice  # noqa: E402
+from duet.adapters.comind.shared_world_features import cpf_to_device  # noqa: E402
 
 FPS, DET_FPS, IMG, NATIVE = 30, 3, 640, 1408
 VOCAB = {
@@ -119,13 +120,20 @@ def build_role(rec: Path, proc: Path, role: str, feats: np.ndarray, model, tmp: 
     anchor = parse_mp4_tail((proc / f"mp4_tail_{role}.bin").read_bytes()); dev_ts = frame_device_times_ns(anchor)
     s = person_slice(role)
     t0 = time.time()
-    for start in range(0, len(frames), 64):
-        batch = frames[start: start + 64]
-        res = model.predict([str(p) for p in batch], imgsz=IMG, conf=0.2, device="mps", verbose=False)
-        for j, r in enumerate(res):
-            k = start + j
+    det_cache = proc / f"detections_{role}_v0.npz"
+    if det_cache.exists():
+        z = np.load(det_cache, allow_pickle=True); dets = list(z["dets"])
+        log(f"    {role}: {len(dets)} cached detection frames")
+    else:
+        dets = []
+        for start in range(0, len(frames), 64):
+            batch = frames[start: start + 64]
+            for r in model.predict([str(p) for p in batch], imgsz=IMG, conf=0.2, device="mps", verbose=False):
+                dets.append((r.boxes.xyxy.cpu().numpy().astype(np.float32), r.boxes.conf.cpu().numpy().astype(np.float32), r.boxes.cls.cpu().numpy().astype(np.int16)))
+        np.savez_compressed(det_cache, dets=np.array(dets, dtype=object), names=np.array(list(model.names.values())))
+    for k, (boxes, conf, cls) in enumerate(dets):
+        if True:
             fi = min(n - 1, int(round(k / DET_FPS * FPS)))
-            boxes = r.boxes.xyxy.cpu().numpy(); conf = r.boxes.conf.cpu().numpy(); cls = r.boxes.cls.cpu().numpy().astype(int)
             names = [model.names[c] for c in cls]; cats = np.array([NAME2CAT.get(nm, -1) for nm in names])
             f = np.zeros(OBJ_DIM, np.float32); f[-1] = 1.0
             ci = int(np.argmin(np.abs(cts - dev_ts[min(fi, len(dev_ts) - 1)] / 1000)))
@@ -149,7 +157,7 @@ def build_role(rec: Path, proc: Path, role: str, feats: np.ndarray, model, tmp: 
                     f[h * (len(CATS) + 1) + cats[best]] = 1.0; f[h * (len(CATS) + 1) + len(CATS)] = 1.0
             g0 = 2 * (len(CATS) + 1)
             if feats[fi, s.start + 2 * HAND_DIM + 6] > 0 and len(boxes):
-                gz = project_points(rgb, feats[fi, s.start + 2 * HAND_DIM: s.start + 2 * HAND_DIM + 3][None])[0]
+                gz = project_points(rgb, cpf_to_device(feats[fi, s.start + 2 * HAND_DIM: s.start + 2 * HAND_DIM + 3][None].astype(np.float64)))[0]
                 if np.isfinite(gz).all():
                     inb = (gz[0] >= boxes[:, 0]) & (gz[0] <= boxes[:, 2]) & (gz[1] >= boxes[:, 1]) & (gz[1] <= boxes[:, 3]) & (cats >= 0)
                     if inb.any():

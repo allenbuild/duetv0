@@ -27,14 +27,10 @@ Features per frame (WORLD_DIM = 34), all metres or unit-less, 0 where invalid:
   32     leader hands valid (any)
   33     helper hands valid (any)
 
-UNVERIFIED FRAME ASSUMPTION: the gaze point is produced in CPF (central pupil frame) by
-kinematics.load_gaze_features and is treated here as a device-frame point. T_Device_CPF is
-NOT present in MPS output (online_calibration.jsonl carries only T_Device_Camera and
-T_Device_Imu); it lives in the factory calibration inside the VRS, which this pipeline does
-not download. So the claim that CPF-to-device is a small offset is currently UNTESTED here.
-Features 25-28 (gaze-to-partner distances) depend on it and should be treated as provisional
-until the transform is obtained and applied. The forward axis (29-30) no longer guesses:
-it uses the measured RGB optical axis; see rgb_forward_axis.
+Gaze frame: the gaze point is produced in CPF and converted to the device frame with T_Device_CPF,
+measured from the factory calibration in the VRS header (identical across three Aria Gen1 units:
+37.6 deg rotation, 7 cm offset; see T_Device_CPF_nominal.json). Features 25-28 use the converted point.
+The forward axis (29-30) uses the measured RGB optical axis; see rgb_forward_axis.
 """
 from __future__ import annotations
 
@@ -134,12 +130,26 @@ def load_poses(csv_path: Path, query_ts_ns: np.ndarray):
     return R, t, valid, str(uid)
 
 
+T_DEVICE_CPF_PATH = Path(__file__).with_name("aria_t_device_cpf.json")
+# Measured from the factory calibration in the VRS header of three Aria Gen1 (DVT-S) units, identical to
+# 1e-6: CPF is rotated 37.6 deg and offset 7 cm from the device frame. p_device = R @ p_cpf + t.
+T_DEVICE_CPF = np.array([[-0.0319, -0.9986, -0.0415, 0.0050], [0.7934, 0.0000, -0.6088, -0.0491],
+                         [0.6079, -0.0523, 0.7923, -0.0492], [0.0, 0.0, 0.0, 1.0]])
+if T_DEVICE_CPF_PATH.exists():
+    T_DEVICE_CPF = np.array(json.load(open(T_DEVICE_CPF_PATH))["T_Device_CPF_4x4"])
+
+
+def cpf_to_device(p_cpf: np.ndarray) -> np.ndarray:
+    """[N,3] gaze points in CPF -> device frame."""
+    return p_cpf @ T_DEVICE_CPF[:3, :3].T + T_DEVICE_CPF[:3, 3]
+
+
 def _hand_points(feat: np.ndarray, role: str):
     """Per role: wrists [N,2,3] (L,R), valid [N,2], gaze point [N,3], gaze valid [N] in device frame."""
     s = person_slice(role)
     wr = np.stack([feat[:, s.start + h * HAND_DIM + 15: s.start + h * HAND_DIM + 18] for h in range(2)], axis=1).astype(np.float64)
     hv = np.stack([feat[:, s.start + h * HAND_DIM + 25] > 0 for h in range(2)], axis=1)
-    g = feat[:, s.start + 2 * HAND_DIM: s.start + 2 * HAND_DIM + 3].astype(np.float64)
+    g = cpf_to_device(feat[:, s.start + 2 * HAND_DIM: s.start + 2 * HAND_DIM + 3].astype(np.float64))
     gv = feat[:, s.start + 2 * HAND_DIM + 6] > 0
     return wr, hv, g, gv
 

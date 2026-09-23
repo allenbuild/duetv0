@@ -91,3 +91,17 @@ def test_world_transforms_round_trip():
     # quarter turn about z maps x -> y (active rotation, same convention as duet.geometry.rotations)
     Rz = quat_xyzw_to_R(np.array([[0, 0, np.sin(np.pi / 4), np.cos(np.pi / 4)]]))
     assert np.allclose(Rz[0] @ np.array([1, 0, 0]), [0, 1, 0], atol=1e-9)
+
+
+def test_t_device_cpf_is_the_measured_aria_constant():
+    """T_Device_CPF read from the factory calibration in three Aria Gen1 (DVT-S) VRS headers
+    (two recordings, two serials) is identical: 37.6 deg rotation, 7 cm offset. Gaze is
+    produced in CPF; treating it as device-frame put the projected gaze ~100 px off."""
+    from duet.adapters.comind.shared_world_features import T_DEVICE_CPF, cpf_to_device
+
+    R, t = T_DEVICE_CPF[:3, :3], T_DEVICE_CPF[:3, 3]
+    assert np.allclose(R @ R.T, np.eye(3), atol=1e-3)
+    assert abs(np.degrees(np.arccos(R[2, 2])) - 37.6) < 0.5
+    assert abs(np.linalg.norm(t) - 0.0697) < 0.002
+    p = cpf_to_device(np.array([[0.0, 0.0, 1.0]]))[0]
+    assert np.allclose(p, R[:, 2] + t, atol=1e-9)
