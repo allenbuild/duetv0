@@ -107,6 +107,28 @@ Same 44 pairs, same folds, same trees, with and without the object block (AUROC)
 
 (parenthesis = matched run without objects). Object identity lifts the paired model on every task by +0.01 to +0.03 and widens the paired-vs-shuffled gap (joint attention 0.732 vs 0.637; helper action 0.741 vs 0.704). It does **not** move handover-onset anticipation beyond where speech left it (0.609). Category-level "what is held / looked at" is not the missing cue for onsets; the specific object requested probably is, and that needs object tracking across both views in one frame, which is the shared-world problem again.
 
+
+## Review of 22 Sep (PR #1, Andrew) and what it changed
+
+Independent reproduction on a second machine matched every single-view and paired number in this document exactly. Three corrections were made and are now reflected here and in the proposal:
+
+1. **The de-synchronised control cannot establish "interaction".** Rolling the partner destroys its alignment with the labels as well as with the other person, so the control scores like a single view. It rules out "more input columns"; it cannot separate *two independent signals combined* from *the relationship between them*. The right null is **late fusion**: average the leader-only and helper-only models' held-out probabilities. Reproduced here (seed 0, 44 pairs, same folds):
+
+| task | best single | both, de-sync | late fusion | both, paired | paired − late fusion | folds won |
+|---|---|---|---|---|---|---|
+| joint attention | 0.670 | 0.614 | 0.688 | **0.703** | **+0.016** [+0.012, +0.027] | 5/5 |
+| handover in progress | 0.632 | 0.578 | 0.632 | 0.637 | +0.006 [−0.015, +0.036] | 4/5 |
+| onset < 5 s | 0.571 | 0.574 | 0.594 | 0.581 | −0.013 [−0.060, +0.020] | 2/5 |
+| helper action < 2 s | 0.697 | 0.707 | 0.736 | 0.728 | −0.008 [−0.016, +0.006] | 2/5 |
+
+So: **joint attention is a genuine interaction effect** (survives every control, all folds, bootstrap P = 1.000). For the other three tasks the paired gain over a single view is real but is explained by combining two informative streams; it is not evidence that the model uses their correspondence. Earlier sections that say "the gain comes from the interaction itself" for handovers and helper actions are superseded by this table.
+
+2. **Receiver anticipation was an artefact of asymmetric search windows** (receiver searched from 1 s earlier than the giver). With identical windows: 44 % of receivers move first, median +0.17 s. No systematic anticipation. Corrected in the metrics section above.
+
+3. **Gaze frame.** Gaze is produced in CPF; I treated it as device-frame with a comment calling the offset small. The transform, read from the factory calibration in the VRS header (identical across three units), is a 37.6° rotation and 7 cm offset. It is now applied in the shared-world block (features 25–28) and in the video pipeline's gaze projection, where the previous projection was ~100 px off. World features are rebuilt; object features are being rebuilt (detections cached). The gaze-on-object numbers in "New result 5" predate the fix and will be replaced. The "forward" axis in features 29–30 now uses the measured RGB optical axis (38.7° off device +Z), per the review.
+
+Also from the review: SCOIA count for the 44 pairs is 756 (986 was the 55-recording total); the shuffled control is now deterministic; `scripts/fetch_comind_kinematic_subset.py` restores the MP4-tail fetch that the original pipeline relied on from an uncommitted scratch script; 8 causality tests pin the strictly-causal model.
+
 ## Where handover anticipation stands
 
 Best onset-within-5 s is still 0.61 (v1). The helper-action task shows what changes it: when the target is "the responder's next move" rather than "the moment a reach begins", and the cue-giver's body is in the input, anticipation two seconds out reaches 0.73. The remaining gap is object identity (what is being asked for, what each hand holds), which needs video.

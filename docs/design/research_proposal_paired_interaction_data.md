@@ -6,7 +6,7 @@ Duet Labs, 2026-09-21. Draft for feedback from Sebastian Sartor (MIT FutureTech)
 
 For robot capabilities that involve a human partner (handover, shared manipulation, anticipating a partner's next action), training data that records **both** humans in a collaboration, synchronised and in one spatial frame, produces more downstream capability per hour and per dollar than the same quantity of single-person demonstration data. The mechanism is that the second person's behaviour carries information about intent, timing and role that is absent from a single-person recording. If true, this is a data-scaling argument, not merely a dataset argument.
 
-Null hypothesis to falsify: paired data is just more video; a model given the partner's stream does no better than a model given a partner stream that has been de-synchronised.
+Null hypotheses to falsify, in order: (i) paired data is just more input: a model given the partner's stream does no better than one given a de-synchronised partner stream; (ii) paired data is two independent signals: the paired model does no better than averaging two single-person models (late fusion). Only beating (ii) is an interaction claim.
 
 ## 2. Collaboration metrics (defined first, as requested)
 
@@ -26,14 +26,16 @@ These map directly onto the operator product (waiting, hand-offs, coordination b
 
 Sensors: two Meta Aria headsets, hardware time-synchronised; onboard 3D hand tracking, gaze, head SLAM; Multi-SLAM shared world for 36 pairs. No pixels are used by any model below. Evaluation: recording-level 5-fold cross-validation; no pair is ever seen in training.
 
-The ablation Sebastian asked for, with a de-synchronised control (partner stream circularly shifted ≥ 60 s; identical inputs, interaction destroyed). Gradient-boosted trees on causal window statistics; AUROC, chance 0.50:
+The ablation Sebastian asked for, with two controls: de-synchronised partner (shifted ≥ 60 s) and late fusion (average of the two single-person models). Gradient-boosted trees on causal window statistics; AUROC, chance 0.50; 5-fold recording-level CV, seed 0:
 
-| task | best single person | both, de-synchronised | both, paired |
-|---|---|---|---|
-| joint attention now | 0.675 | 0.635 | **0.719** |
-| handover in progress | 0.624 | 0.607 | **0.662** |
-| handover starts within 5 s | 0.589 | 0.574 | **0.609** |
-| helper's next action starts within 2 s, from the **leader's** body alone | 0.697 | (pending) | (pending) |
+| task | best single person | both, de-synchronised | late fusion | both, paired |
+|---|---|---|---|---|
+| joint attention now | 0.670 | 0.614 | 0.688 | **0.703** (beats late fusion 5/5 folds, bootstrap +0.020 [+0.012, +0.027]) |
+| handover in progress | 0.632 | 0.578 | 0.632 | 0.637 (matches late fusion) |
+| handover starts within 5 s | 0.571 | 0.574 | 0.594 | 0.581 (matches late fusion) |
+| helper's next action within 2 s | 0.697 (from the leader's body alone) | 0.707 | 0.736 | 0.728 (matches late fusion) |
+
+Reading: joint attention is a genuine interaction effect. On the other three tasks the paired gain over a single person is real but is accounted for by combining two independent signals; the model is not shown to use their correspondence. Adding object identity read from the ego video lifts the paired model further (joint attention 0.732, helper action 0.741); the late-fusion comparison with those features is pending a gaze-frame correction.
 
 Adding shared-world geometry (both people's hands and gaze in one frame) raises joint attention from 0.646 to 0.729 on the 11 labelled pairs that have it. Kinematic collaboration metrics: receivers begin moving before the giver's reach in 44 % of measurable handovers (median response +0.17 s), i.e. no systematic anticipation once giver and receiver onsets are detected with identical search windows; wrist-speed synchrony is 0.52 [0.36, 0.73]; hands meet at 3 cm median separation at transfer.
 
