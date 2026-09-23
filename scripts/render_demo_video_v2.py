@@ -161,7 +161,7 @@ def main():
                 for q in range(len(r.keypoints.xy)):
                     kp, kc = r.keypoints.xy[q].cpu().numpy(), r.keypoints.conf[q].cpu().numpy()
                     good = kc > 0.5
-                    if good.sum() >= 6 and (kp[good, 0].ptp() > 40 or kp[good, 1].ptp() > 40) and not (good[[5, 6]].sum() == 0):
+                    if good.sum() >= 6 and (np.ptp(kp[good, 0]) > 40 or np.ptp(kp[good, 1]) > 40) and not (good[[5, 6]].sum() == 0):
                         body.append((kp, np.where(good, kc, 0.0)))
             per[role].append(dict(img=plt.imread(frames[i]), hp=hp, hd=hd, gp=gp, boxes=boxes, held=held, body=body))
     # signals
