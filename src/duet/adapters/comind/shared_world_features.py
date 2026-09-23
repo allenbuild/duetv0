@@ -21,14 +21,20 @@ Features per frame (WORLD_DIM = 34), all metres or unit-less, 0 where invalid:
   26     |helper gaze point (world) - nearest leader wrist|
   27     |leader gaze point - helper head|
   28     |helper gaze point - leader head|
-  29     cos(angle between leader forward axis and direction to helper head)
-  30     cos(angle between helper forward axis and direction to leader head)
+  29     cos(angle between leader RGB optical axis and direction to helper head)
+  30     cos(angle between helper RGB optical axis and direction to leader head)
   31     both poses valid
   32     leader hands valid (any)
   33     helper hands valid (any)
 
-Gaze point is taken in CPF and treated as device frame (CPF-to-device is a small
-fixed offset on Aria; fine for metre-scale distances, noted as an approximation).
+UNVERIFIED FRAME ASSUMPTION: the gaze point is produced in CPF (central pupil frame) by
+kinematics.load_gaze_features and is treated here as a device-frame point. T_Device_CPF is
+NOT present in MPS output (online_calibration.jsonl carries only T_Device_Camera and
+T_Device_Imu); it lives in the factory calibration inside the VRS, which this pipeline does
+not download. So the claim that CPF-to-device is a small offset is currently UNTESTED here.
+Features 25-28 (gaze-to-partner distances) depend on it and should be treated as provisional
+until the transform is obtained and applied. The forward axis (29-30) no longer guesses:
+it uses the measured RGB optical axis; see rgb_forward_axis.
 """
 from __future__ import annotations
 
@@ -45,6 +51,41 @@ from duet.adapters.comind.kinematics import (
 WORLD_DIM = 34
 POSE_MAX_GAP_US = 20_000
 FPS = 30
+
+
+# Nominal camera-rgb optical axis in the Aria device frame, measured from the first record of
+# mps_leader_trimmed_vrs/slam/online_calibration.jsonl on recording 43276420. Used only when a
+# recording's own rgb_calib_<role>.json is absent; it is 38.7 deg off device +Z, so it is a far
+# better default than +Z, but per-recording calibration is preferred and fetched when available.
+NOMINAL_RGB_AXIS_DEVICE = np.array([0.0878, -0.6196, 0.7800])
+
+
+def quat_wxyz_to_R(w: float, x: float, y: float, z: float) -> np.ndarray:
+    """Project Aria JSON quaternion convention [w, [x, y, z]] -> 3x3 active rotation."""
+    n = np.sqrt(w * w + x * x + y * y + z * z)
+    w, x, y, z = w / n, x / n, y / n, z / n
+    return np.array([
+        [1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+        [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+        [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)],
+    ])
+
+
+def rgb_forward_axis(proc_dir: Path, role: str) -> np.ndarray:
+    """Unit optical axis of camera-rgb in the wearer's device frame.
+
+    The device frame is anchored to a SLAM camera, not to the viewing direction, so device
+    +Z is NOT where the wearer is facing. Reads rgb_calib_<role>.json (written by
+    scripts/fetch_comind_kinematic_subset.py from the head of online_calibration.jsonl);
+    falls back to the measured nominal axis, which is near-identical across Aria units.
+    """
+    p = proc_dir / f"rgb_calib_{role}.json"
+    if not p.exists():
+        return NOMINAL_RGB_AXIS_DEVICE / np.linalg.norm(NOMINAL_RGB_AXIS_DEVICE)
+    T = json.load(open(p))["T_Device_Camera"]
+    w, (x, y, z) = T["UnitQuaternion"][0], T["UnitQuaternion"][1]
+    axis = quat_wxyz_to_R(w, x, y, z)[:, 2]
+    return axis / np.linalg.norm(axis)
 
 
 def multislam_dir(rec_dir: Path, role: str) -> Path | None:
@@ -151,8 +192,12 @@ def build_recording_world(raw_root: Path, proc_root: Path, recording_id: str, ki
     f[:, 26] = np.where(gvH & both & hvL.any(1), gwL, 0)
     f[:, 27] = np.where(gvL & both, np.linalg.norm(GL - tH, axis=1), 0)
     f[:, 28] = np.where(gvH & both, np.linalg.norm(GH - tL, axis=1), 0)
-    # forward axis: Aria device frame forward ~ +Z (camera-rgb looks along device +Z, roughly)
-    fwdL, fwdH = RL[:, :, 2], RH[:, :, 2]
+    # Forward axis = the RGB camera's optical axis, NOT device +Z. Measured on recording
+    # 43276420, camera-rgb sits 38.7 deg off device +Z (the glasses angle the camera down),
+    # so using +Z mis-states where a wearer is facing by that much.
+    axL = rgb_forward_axis(proc_root / recording_id, "leader")
+    axH = rgb_forward_axis(proc_root / recording_id, "helper")
+    fwdL, fwdH = RL @ axL, RH @ axH
     toH = tH - tL; toL = -toH
     nrm = np.linalg.norm(toH, axis=1) + 1e-6
     f[:, 29] = np.where(both, (fwdL * toH).sum(1) / nrm, 0)

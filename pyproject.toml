@@ -23,6 +23,21 @@ dev = [
     "pytest>=8",
     "ruff>=0.6",
 ]
+# Paired-benchmark ML pipeline (src/duet/ml, scripts/*benchmark*, scripts/baseline_*).
+# Kept optional so the core adapters stay installable without a deep-learning stack.
+ml = [
+    "torch>=2.2",
+    "scikit-learn>=1.4",
+    "scipy>=1.11",
+    "matplotlib>=3.8",
+]
+# Object-identity features from ego video (scripts/build_comind_objects.py) and
+# utterance embeddings (scripts/build_comind_speech_emb.py).
+perception = [
+    "ultralytics>=8.2",
+    "sentence-transformers>=3.0",
+    "projectaria-tools>=1.5",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
