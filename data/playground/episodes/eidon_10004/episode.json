@@ -1,0 +1,87 @@
+{
+ "name": "eidon_10004",
+ "streams": [
+  {
+   "name": "ego",
+   "role": "ego",
+   "path": "streams/ego.mp4",
+   "person": "contributor",
+   "fps": 29.98588994589796,
+   "width": 1280,
+   "height": 720,
+   "duration_s": 61.731533,
+   "has_audio": true,
+   "offset_s": 0.0,
+   "offset_confidence": null,
+   "imu": "imu/ego.parquet"
+  }
+ ],
+ "reference": "ego",
+ "proc_fps": 10.0,
+ "proc_size": 640,
+ "status": {
+  "probe": {
+   "state": "done",
+   "detail": "1 streams",
+   "started": 1790349854.602311,
+   "finished": 1790349854.6782742
+  },
+  "align": {
+   "state": "done",
+   "detail": "ego +0.00s",
+   "started": 1790349854.678706,
+   "finished": 1790349854.767513
+  },
+  "frames": {
+   "state": "done",
+   "detail": "617 frames x 1 streams at 10.0 fps",
+   "started": 1790349854.767835,
+   "finished": 1790349858.7414951
+  },
+  "body2d": {
+   "state": "done",
+   "detail": "YOLOv8n-pose, up to 4 tracked people per view",
+   "started": 1790349859.7463539,
+   "finished": 1790349863.918863
+  },
+  "hands": {
+   "state": "done",
+   "detail": "MediaPipe 21-landmark hands on ego views",
+   "started": 1790349864.353899,
+   "finished": 1790349882.353455
+  },
+  "objects": {
+   "state": "done",
+   "detail": "YOLO-World, kitchen/household vocabulary, ego views",
+   "started": 1790349882.356147,
+   "finished": 1790349890.21167
+  },
+  "body3d": {
+   "state": "done",
+   "detail": "monocular MediaPipe world landmarks on ego (not triangulated)",
+   "started": 1790349890.222253,
+   "finished": 1790349903.550244
+  },
+  "imu_arm": {
+   "state": "done",
+   "detail": "arm chains for ['ego']",
+   "started": 1790349903.5532002,
+   "finished": 1790349903.685778
+  },
+  "qc": {
+   "state": "done",
+   "detail": "min good-frame 0.73",
+   "started": 1790349903.6861382,
+   "finished": 1790349905.0243762
+  },
+  "export": {
+   "state": "done",
+   "detail": "617 rows x 21 columns -> derived/records.parquet",
+   "started": 1790349905.024727,
+   "finished": 1790349905.0553658
+  }
+ },
+ "common_start_s": 0.0,
+ "common_end_s": 61.731533,
+ "notes": []
+}

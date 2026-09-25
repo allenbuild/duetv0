@@ -1,0 +1,73 @@
+{
+ "thresholds": {
+  "sharp_min": 40.0,
+  "bright_min": 35.0,
+  "bright_max": 225.0,
+  "motion_norm_px": 12.0
+ },
+ "streams": {
+  "leader": {
+   "role": "ego",
+   "n_frames": 466,
+   "good_frame_percent": 0.9484978540772532,
+   "hand_presence_ratio": 0.944206008583691,
+   "person_presence_ratio": null,
+   "stability_score": 0.6374287605285645,
+   "lighting_score": 0.5041221866634953,
+   "average_brightness": 60.494662399619436,
+   "average_sharpness": 71.52644391870503,
+   "average_optical_flow_px": 6.357673181769669,
+   "alignment_confidence": null,
+   "offset_s": 0.0
+  },
+  "helper": {
+   "role": "ego",
+   "n_frames": 466,
+   "good_frame_percent": 0.9527896995708155,
+   "hand_presence_ratio": 0.8605150214592274,
+   "person_presence_ratio": null,
+   "stability_score": 0.7743765910466512,
+   "lighting_score": 0.3697702203185772,
+   "average_brightness": 44.372426438229276,
+   "average_sharpness": 72.31468253366299,
+   "average_optical_flow_px": 4.2828869394076765,
+   "alignment_confidence": 7.521689398633782,
+   "offset_s": -1.73
+  },
+  "gopro_front": {
+   "role": "exo",
+   "n_frames": 466,
+   "good_frame_percent": 1.0,
+   "hand_presence_ratio": null,
+   "person_presence_ratio": 1.0,
+   "stability_score": 0.978959341843923,
+   "lighting_score": 0.6573621026534682,
+   "average_brightness": 78.88345231841618,
+   "average_sharpness": 339.2237284585946,
+   "average_optical_flow_px": 0.37130501206203176,
+   "alignment_confidence": 6.1726211872114645,
+   "offset_s": 0.9
+  },
+  "gopro_back": {
+   "role": "exo",
+   "n_frames": 466,
+   "good_frame_percent": 1.0,
+   "hand_presence_ratio": null,
+   "person_presence_ratio": 1.0,
+   "stability_score": 0.9955359840144714,
+   "lighting_score": 0.6485650277926799,
+   "average_brightness": 77.82780333512159,
+   "average_sharpness": 319.23874151448535,
+   "average_optical_flow_px": 0.059029447792037844,
+   "alignment_confidence": 7.657912478734638,
+   "offset_s": 1.67
+  }
+ },
+ "episode": {
+  "both_visible_ratio": 1.0,
+  "hands_all_egos_ratio": 0.8047210300429185,
+  "min_good_frame_percent": 0.9484978540772532,
+  "min_alignment_confidence": 6.1726211872114645,
+  "duration_s": 46.6
+ }
+}

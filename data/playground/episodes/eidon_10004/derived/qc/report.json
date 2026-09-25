@@ -1,0 +1,31 @@
+{
+ "thresholds": {
+  "sharp_min": 40.0,
+  "bright_min": 35.0,
+  "bright_max": 225.0,
+  "motion_norm_px": 12.0
+ },
+ "streams": {
+  "ego": {
+   "role": "ego",
+   "n_frames": 617,
+   "good_frame_percent": 0.7341977309562399,
+   "hand_presence_ratio": 0.6482982171799028,
+   "person_presence_ratio": null,
+   "stability_score": 0.4352465867996216,
+   "lighting_score": 0.9641633068203561,
+   "average_brightness": 124.30040318155727,
+   "average_sharpness": 74.7294632855778,
+   "average_optical_flow_px": 7.284371505019727,
+   "alignment_confidence": null,
+   "offset_s": 0.0
+  }
+ },
+ "episode": {
+  "both_visible_ratio": null,
+  "hands_all_egos_ratio": 0.6482982171799028,
+  "min_good_frame_percent": 0.7341977309562399,
+  "min_alignment_confidence": null,
+  "duration_s": 61.731533
+ }
+}

@@ -1,0 +1,128 @@
+{
+ "name": "comind_43276420_clip",
+ "streams": [
+  {
+   "name": "leader",
+   "role": "ego",
+   "path": "streams/leader.mp4",
+   "person": "leader",
+   "fps": 30.0,
+   "width": 1408,
+   "height": 1408,
+   "duration_s": 50.0,
+   "has_audio": true,
+   "offset_s": 0.0,
+   "offset_confidence": null,
+   "imu": null
+  },
+  {
+   "name": "helper",
+   "role": "ego",
+   "path": "streams/helper.mp4",
+   "person": "helper",
+   "fps": 30.0,
+   "width": 1408,
+   "height": 1408,
+   "duration_s": 50.0,
+   "has_audio": true,
+   "offset_s": -1.73,
+   "offset_confidence": 7.521689398633782,
+   "imu": null
+  },
+  {
+   "name": "gopro_front",
+   "role": "exo",
+   "path": "streams/gopro_front.mp4",
+   "person": null,
+   "fps": 30.0,
+   "width": 1280,
+   "height": 720,
+   "duration_s": 50.0,
+   "has_audio": true,
+   "offset_s": 0.9,
+   "offset_confidence": 6.1726211872114645,
+   "imu": null
+  },
+  {
+   "name": "gopro_back",
+   "role": "exo",
+   "path": "streams/gopro_back.mp4",
+   "person": null,
+   "fps": 30.0,
+   "width": 1280,
+   "height": 720,
+   "duration_s": 50.0,
+   "has_audio": true,
+   "offset_s": 1.67,
+   "offset_confidence": 7.657912478734638,
+   "imu": null
+  }
+ ],
+ "reference": "leader",
+ "proc_fps": 10.0,
+ "proc_size": 640,
+ "status": {
+  "probe": {
+   "state": "done",
+   "detail": "4 streams",
+   "started": 1790349757.158189,
+   "finished": 1790349757.309116
+  },
+  "align": {
+   "state": "done",
+   "detail": "leader +0.00s; helper -1.73s (x7.5); gopro_front +0.90s (x6.2); gopro_back +1.67s (x7.7)",
+   "started": 1790349757.309642,
+   "finished": 1790349757.606731
+  },
+  "frames": {
+   "state": "done",
+   "detail": "466 frames x 4 streams at 10.0 fps",
+   "started": 1790349757.607161,
+   "finished": 1790349768.72499
+  },
+  "body2d": {
+   "state": "done",
+   "detail": "YOLOv8n-pose, up to 4 tracked people per view",
+   "started": 1790349769.9378712,
+   "finished": 1790349783.937262
+  },
+  "hands": {
+   "state": "done",
+   "detail": "MediaPipe 21-landmark hands on ego views",
+   "started": 1790349784.420584,
+   "finished": 1790349813.6751208
+  },
+  "objects": {
+   "state": "done",
+   "detail": "YOLO-World, kitchen/household vocabulary, ego views",
+   "started": 1790349813.6771798,
+   "finished": 1790349833.095455
+  },
+  "body3d": {
+   "state": "done",
+   "detail": "monocular MediaPipe world landmarks on gopro_front (not triangulated)",
+   "started": 1790349833.155605,
+   "finished": 1790349845.237582
+  },
+  "imu_arm": {
+   "state": "skipped",
+   "detail": "no IMU streams",
+   "started": 1790349845.241052
+  },
+  "qc": {
+   "state": "done",
+   "detail": "min good-frame 0.95",
+   "started": 1790349845.242121,
+   "finished": 1790349851.3597708
+  },
+  "export": {
+   "state": "done",
+   "detail": "466 rows x 50 columns -> derived/records.parquet",
+   "started": 1790349851.360449,
+   "finished": 1790349851.651906
+  }
+ },
+ "common_start_s": 1.67,
+ "common_end_s": 48.27,
+ "notes": []
+}
