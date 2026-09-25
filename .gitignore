@@ -38,3 +38,7 @@ outputs/*
 !data/raw/.gitkeep
 !data/processed/.gitkeep
 !outputs/.gitkeep
+
+# playground working data
+data/playground/*
+!data/playground/.gitkeep
