@@ -1,0 +1,28 @@
+{
+ "_comment": "Publish allowlist for scripts/playground_export_static.py: ONLY these episodes can be exported to the public static site (plg.duetlabs.co / duet-playground.vercel.app). Every entry records the basis for redistributing identifiable participant data. An entry is published when its license is known OR it carries an explicit \"approved\" record ({by, date YYYY-MM-DD, note}); an UNKNOWN license without approval is refused (override: --allow-unknown-license). attribution and license are shown in the page footer; consent_basis, notes and approved are internal and not published.",
+ "episodes": {
+  "eidon_10004": {
+   "license": "CC-BY-4.0",
+   "license_url": "https://creativecommons.org/licenses/by/4.0/",
+   "consent_basis": "UNKNOWN - not recorded in this repo",
+   "attribution": "eidon-ai/tracker-pov, CC-BY-4.0; re-encoded, downscaled, overlays added. IMU arm chains derived from eidon-ai/tracker-pov-imu.",
+   "notes": "Public dataset recording 10004 (one ego video + 7-slot IMU). The license of eidon-ai/tracker-pov-imu is not recorded in the repo (UNKNOWN). Published since 516ddf3.",
+   "approved": {
+    "by": "repo owner",
+    "date": "2026-09-26",
+    "note": "kept live by owner decision; license/consent terms not yet recorded"
+   }
+  },
+  "comind_43276420_clip": {
+   "license": "UNKNOWN - redistribution terms not recorded in this repo",
+   "consent_basis": "UNKNOWN - not recorded in this repo",
+   "attribution": "CoMind dataset (comind.ethz.ch); redistribution terms not yet recorded",
+   "notes": "CoMind recording 43276420-701f-4731-b9ab-bebc7fd14994, 50 s clip (2 Aria ego + 2 GoPro exo) with identifiable participants. No redistribution terms recorded; the CoMind contact is in docs/design/comind_sync_forensics.md. Published since 516ddf3.",
+   "approved": {
+    "by": "repo owner",
+    "date": "2026-09-26",
+    "note": "kept live by owner decision; license/consent terms not yet recorded"
+   }
+  }
+ }
+}
