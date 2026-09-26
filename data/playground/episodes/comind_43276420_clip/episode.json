@@ -117,9 +117,9 @@
   },
   "export": {
    "state": "done",
-   "detail": "466 rows x 64 columns -> derived/records.parquet",
-   "started": 1790392825.0061052,
-   "finished": 1790392825.1120079
+   "detail": "466 rows x 149 columns -> derived/records.parquet",
+   "started": 1790411171.4212701,
+   "finished": 1790411171.6062999
   },
   "calib": {
    "state": "skipped",
@@ -153,6 +153,48 @@
    "detail": "no fixed camera registered to the board",
    "started": 1790392825.00497,
    "finished": 1790392604.348187
+  },
+  "speech": {
+   "state": "done",
+   "detail": "whisper-small on 4 streams (en): 16 utterances / 86 words (dropped 33 duplicates); by speaker leader 6, helper 10",
+   "started": 1790407662.475033,
+   "finished": 1790407685.921462
+  },
+  "track": {
+   "state": "done",
+   "detail": "leader: 4 tracks, switches 0->0; helper: 4 tracks, switches 0->0; gopro_front: 3 tracks, switches 0->0; gopro_back: 2 tracks, switches 0->0; cross-view: cooccurrence+appearance (no triangulated bodies)",
+   "started": 1790408091.027717,
+   "finished": 1790408093.011372
+  },
+  "annotate": {
+   "state": "done",
+   "detail": "dry: 24 keyframes every 2s (0 cached, 0 errors), 0.2s",
+   "started": 1790407586.717792,
+   "finished": 1790407587.0145931
+  },
+  "gaze_proxy": {
+   "state": "done",
+   "detail": "leader: image, partner seen 67%, looking 0%; helper: image, partner seen 31%, looking 0%; mutual 0%",
+   "started": 1790407789.460201,
+   "finished": 1790407789.518961
+  },
+  "metrics": {
+   "state": "done",
+   "detail": "10 handovers (contact), 12.9/min; coordination 75; idle leader 0%, helper 0%",
+   "started": 1790411199.354879,
+   "finished": 1790411199.380609
+  },
+  "contact": {
+   "state": "done",
+   "detail": "leader: contact 40% of frames, 39 events, not used (no episode/zed/<stream>/depth); helper: contact 43% of frames, 48 events, not used (no episode/zed/<stream>/depth)",
+   "started": 1790408103.712491,
+   "finished": 1790408103.858599
+  },
+  "autolabel": {
+   "state": "done",
+   "detail": "1 joint-attention + 1 handover proposals (model 2026-09-26)",
+   "started": 1790409985.2306619,
+   "finished": 1790409986.5969868
   }
  },
  "common_start_s": 1.67,

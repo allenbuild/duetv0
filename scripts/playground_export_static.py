@@ -47,6 +47,8 @@ def main():
     json.dump(index, open(out / "episodes.json", "w"))
     static = ROOT / "src/duet/playground/static"
     html = (static / "index.html").read_text()
+    import re as _re
+    html = _re.sub(r'<nav id="pages".*?</nav>', "", html, flags=_re.S)  # review/metrics/annotate pages need the API server, not in the static export
     html = html.replace('<button id="runAll" class="primary">Run pipeline</button>\n  <button id="rerun">Re-run all</button>', '<span class="mono" style="color:var(--mute)">static export · processed offline</span>')
     (out / "index.html").write_text(html)
     js = (static / "app.js").read_text()

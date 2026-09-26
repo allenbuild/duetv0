@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Duet EgoExo Playground · review</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{--bg:#0E1312;--panel:#151C1A;--line:#26302D;--ink:#E6ECE9;--mute:#8A9591;--accent:#3FA58C;--warn:#D9B64A;--bad:#E06060;
+        --left:#57E39B;--right:#FF6B6B;--body:#B58CFF;--obj:#3EA7FF;--held:#FFD447}
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font-family:"IBM Plex Sans",system-ui,sans-serif;font-size:13px}
+  header{display:flex;align-items:center;gap:14px;padding:10px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  header h1{font-size:15px;margin:0;font-weight:600;letter-spacing:.02em} header h1 span{color:var(--accent)}
+  header a{color:var(--mute);text-decoration:none} header a:hover{color:var(--accent)}
+  .mono{font-family:"IBM Plex Mono",ui-monospace,monospace}
+  select,button,input{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:5px 9px;font:inherit}
+  input[type=number]{width:70px} button:hover{border-color:var(--accent)} button:disabled{opacity:.35;cursor:not-allowed}
+  button.v-ok.on{background:var(--accent);color:#06110E;border-color:var(--accent)} button.v-wrong.on{background:var(--bad);color:#fff;border-color:var(--bad)} button.v-unsure.on{background:var(--warn);color:#06110E;border-color:var(--warn)}
+  kbd{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute);border:1px solid var(--line);border-radius:3px;padding:0 4px;margin-left:5px}
+  #progress{height:6px;background:var(--line)} #progress i{display:block;height:100%;background:var(--accent);width:0;transition:width .15s}
+  #ptext{padding:4px 16px;color:var(--mute);font-size:11px}
+  main{display:grid;grid-template-columns:minmax(0,3fr) minmax(300px,2fr);gap:10px;padding:10px 16px}
+  #frame{position:relative;background:#000;border:1px solid var(--line)} #canvas{display:block;width:100%;height:auto}
+  .tag{position:absolute;left:8px;top:6px;font-size:11px;background:rgba(0,0,0,.6);padding:2px 6px;border-radius:3px} .tag b{color:var(--accent)}
+  #side{display:grid;gap:10px;align-content:start}
+  .panel{background:var(--panel);border:1px solid var(--line);padding:10px} .panel h3{margin:0 0 6px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);font-weight:500}
+  .vrow{display:grid;grid-template-columns:90px 1fr;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--line)} .vrow:last-child{border-bottom:0}
+  .vrow .lbl{font-weight:500} .vrow .lbl i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:middle}
+  .vrow .btns{display:flex;gap:6px;flex-wrap:wrap} .vrow small{color:var(--mute);display:block;font-weight:400}
+  #nav{display:flex;gap:8px;align-items:center;margin-top:8px}
+  table{border-collapse:collapse;width:100%} td,th{padding:3px 6px;border-bottom:1px solid var(--line);text-align:left;font-size:12px} th{color:var(--mute);font-weight:500} td.num{text-align:right;font-family:"IBM Plex Mono",monospace}
+  .prop{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)} .prop:last-child{border-bottom:0}
+  .prop .st{font-size:11px;color:var(--mute)} .prop .st.accepted{color:var(--accent)} .prop .st.rejected{color:var(--bad)}
+  .legend span{display:inline-block;margin-right:12px;font-size:11px} .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:middle}
+  textarea{width:100%;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:5px 8px;font:inherit;resize:vertical;min-height:34px}
+  @media (max-width:900px){main{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <h1><span>Duet</span> EgoExo Playground · review</h1>
+  <label class="mono" style="color:var(--mute)">episode</label>
+  <select id="episode"></select>
+  <label class="mono" style="color:var(--mute)">frac <input id="frac" type="number" step="0.01" min="0.001" max="1" value="0.02"></label>
+  <label class="mono" style="color:var(--mute)">seed <input id="seed" type="number" step="1" value="0"></label>
+  <button id="reload">Load sample</button>
+  <label class="mono" style="color:var(--mute)"><input type="checkbox" id="showOverlays" checked> overlays</label>
+  <nav style="margin-left:auto;display:flex;gap:12px;font-size:12px"><a href="index.html">viewer</a><a href="annotate.html" id="nav-annotate">annotations</a><a href="metrics.html">metrics</a></nav>
+  <span class="legend"><span><i style="background:var(--left)"></i>left hand</span><span><i style="background:var(--right)"></i>right hand</span><span><i style="background:var(--body)"></i>body</span><span><i style="background:var(--obj)"></i>object</span></span>
+</header>
+<div id="progress"><i></i></div>
+<div id="ptext" class="mono">loading…</div>
+<main>
+  <section id="frame"><canvas id="canvas" width="640" height="360"></canvas><div class="tag" id="ftag"></div></section>
+  <aside id="side">
+    <div class="panel"><h3>Verdicts for this frame</h3>
+      <div class="vrow" data-item="body2d"><div class="lbl"><i style="background:var(--body)"></i>body<small id="n-body2d"></small></div><div class="btns"><button class="v-ok" data-v="ok">ok<kbd>1</kbd></button><button class="v-wrong" data-v="wrong">wrong<kbd>2</kbd></button><button class="v-unsure" data-v="unsure">unsure<kbd>3</kbd></button></div></div>
+      <div class="vrow" data-item="hands"><div class="lbl"><i style="background:var(--left)"></i>hands<small id="n-hands"></small></div><div class="btns"><button class="v-ok" data-v="ok">ok<kbd>q</kbd></button><button class="v-wrong" data-v="wrong">wrong<kbd>w</kbd></button><button class="v-unsure" data-v="unsure">unsure<kbd>e</kbd></button></div></div>
+      <div class="vrow" data-item="objects"><div class="lbl"><i style="background:var(--obj)"></i>objects<small id="n-objects"></small></div><div class="btns"><button class="v-ok" data-v="ok">ok<kbd>a</kbd></button><button class="v-wrong" data-v="wrong">wrong<kbd>s</kbd></button><button class="v-unsure" data-v="unsure">unsure<kbd>d</kbd></button></div></div>
+      <textarea id="note" placeholder="note (optional, attached to the next verdict)"></textarea>
+      <div id="nav"><button id="prev">← prev</button><button id="next">next →<kbd>space</kbd></button><span id="pos" class="mono" style="color:var(--mute)"></span><span style="flex:1"></span><span id="status" class="mono" style="color:var(--mute)"></span></div>
+    </div>
+    <div class="panel"><h3>Proposals (autolabel)</h3><div id="proposals"></div></div>
+    <div class="panel"><h3>Summary</h3><table id="summary"><thead><tr><th>item / stream</th><th>n</th><th>ok</th><th>wrong</th><th>unsure</th><th>accuracy</th></tr></thead><tbody></tbody></table></div>
+  </aside>
+</main>
+<script src="review.js"></script>
+</body>
+</html>

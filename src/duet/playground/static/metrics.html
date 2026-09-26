@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Duet Playground: metrics</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{--bg:#0E1312;--panel:#151C1A;--line:#26302D;--ink:#E6ECE9;--mute:#8A9591;--accent:#3FA58C;--warn:#D9B64A;--bad:#E06060;
+        --left:#57E39B;--right:#FF6B6B;--body:#B58CFF;--obj:#3EA7FF;--held:#FFD447}
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font-family:"IBM Plex Sans",system-ui,sans-serif;font-size:13px}
+  header{display:flex;align-items:center;gap:18px;padding:10px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  header h1{font-size:15px;margin:0;font-weight:600;letter-spacing:.02em} header h1 span{color:var(--accent)}
+  .mono{font-family:"IBM Plex Mono",ui-monospace,monospace}
+  select,button{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:5px 9px;font:inherit}
+  button:hover{border-color:var(--accent)} button.primary{background:var(--accent);color:#06110E;border-color:var(--accent);font-weight:600}
+  nav a{color:var(--mute);text-decoration:none} nav a.here{color:var(--accent)}
+  main{padding:10px 16px;display:grid;gap:12px} main>*,.two>*{min-width:0}
+  #cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}
+  .card{background:var(--panel);border:1px solid var(--line);padding:10px 12px}
+  .card h3{margin:0 0 4px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);font-weight:500}
+  .card .v{font-size:22px;font-weight:600;font-family:"IBM Plex Mono",monospace} .card .v small{font-size:12px;color:var(--mute);font-weight:400;margin-left:4px}
+  .card .sub{color:var(--mute);font-size:11px;margin-top:2px}
+  .panel{background:var(--panel);border:1px solid var(--line);padding:10px} .panel h3{margin:0 0 8px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);font-weight:500}
+  canvas{display:block;width:100%}
+  #perMinute{height:220px} #timeline{height:150px}
+  table{border-collapse:collapse;width:100%} td,th{padding:3px 6px;border-bottom:1px solid var(--line);text-align:left;font-size:12px;white-space:nowrap} td.num,th.num{text-align:right;font-family:"IBM Plex Mono",monospace}
+  .tablewrap{overflow-x:auto}
+  .legend span{display:inline-block;margin-right:12px;font-size:11px} .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:middle}
+  #notes{color:var(--mute);font-size:11px;white-space:pre-wrap;overflow-wrap:anywhere} #formula{color:var(--mute);font-size:11px;max-width:100%;overflow-wrap:anywhere}
+  .two{display:grid;grid-template-columns:2fr 1fr;gap:12px} @media (max-width:900px){.two{grid-template-columns:1fr}}
+  .empty{color:var(--mute);padding:30px;text-align:center}
+</style>
+</head>
+<body>
+<header>
+  <h1><span>Duet</span> EgoExo Playground</h1>
+  <label class="mono" style="color:var(--mute)">episode</label>
+  <select id="episode"></select>
+  <nav id="pages" style="display:flex;gap:12px;font-size:12px"><a href="index.html">viewer</a><a href="review.html">review</a><a class="here" href="metrics.html">metrics</a><a href="annotate.html">annotations</a></nav>
+  <span style="flex:1"></span>
+  <button id="run" class="primary">Recompute metrics</button>
+  <span id="runstate" class="mono" style="color:var(--mute)"></span>
+</header>
+<main>
+  <div id="cards"></div>
+  <div class="two">
+    <div class="panel"><h3>Per minute</h3><canvas id="perMinute"></canvas>
+      <div class="legend" style="margin-top:6px"><span><i style="background:var(--accent)"></i>handovers</span><span><i style="background:var(--warn)"></i>idle fraction</span><span><i style="background:var(--obj)"></i>speech fraction</span><span><i style="background:var(--body)"></i>hands visible</span></div></div>
+    <div class="panel"><h3>Coordination score</h3><div id="score" class="v mono" style="font-size:34px;font-weight:600"></div><div id="components"></div><p id="formula"></p></div>
+  </div>
+  <div class="panel"><h3>Timeline</h3><canvas id="timeline"></canvas>
+    <div class="legend" style="margin-top:6px"><span><i style="background:var(--accent)"></i>handover (giver &rarr; receiver)</span><span><i style="background:var(--warn)"></i>idle</span><span><i style="background:var(--obj)"></i>speaking</span><span><i style="background:#2A3431"></i>hand not visible</span></div></div>
+  <div class="panel"><h3>Handovers</h3><div class="tablewrap"><table id="handovers"><thead></thead><tbody></tbody></table></div></div>
+  <div class="panel"><h3>Definitions &amp; notes</h3><div id="notes" class="mono"></div></div>
+</main>
+<script src="metrics.js"></script>
+</body>
+</html>

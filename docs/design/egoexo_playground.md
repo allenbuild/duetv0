@@ -70,3 +70,20 @@ Munari (Alan Guo, a16z Speedrun) is a closed product that reconstructs egocentri
 ## Known gaps
 
 Body3d is monocular; no camera calibration or triangulation yet. No SLAM camera trajectory. Hand tracking on ego views is 2D + wrist-relative 3D, not metric world-frame hands (HaWoR/WiLoR would replace it). Alignment needs audio on every stream (clap at block start).
+
+## Stages added 2026-09-26 (24 stages total)
+
+Each stage has its own design note in `docs/design/stage_<name>.md` with the validation numbers and the exact commands.
+
+| stage | what | validated on |
+|---|---|---|
+| stereo_depth | depth from a ZED left/right pair without the ZED SDK (SGBM + WLS), PNGs in the SDK layout | synthetic stereo: 0.1–0.5 % median depth error |
+| track | stable person ids (Hungarian on IoU + torso colour, 2 s memory), cross-view matching | CoMind exo views: fragmentation removed, 0 jumps; cross-view fallback flagged ambiguous on same-coloured tops |
+| contact | which object is in which hand (fingertips in box, hysteresis), grasp/release events | CoMind clip: 2 of 3 annotated handovers recovered within 0.6 s; wearer vs partner hands is the main error |
+| gaze_proxy | head-forward gaze ray, angle to partner/objects, mutual gaze (3D via headpose, 2D fallback) | CoMind: head-forward predicts joint attention as well as real gaze (AUROC 0.788 vs 0.776, 11 recs); gaze sits 18° from the RGB axis, mostly pitch |
+| speech | faster-whisper transcript per stream, speaker = loudest own mic, de-duplicated across mics | CoMind clip: coherent two-person dialogue; leader mic needed peak normalisation |
+| annotate | contact-sheet keyframes every 2 s to a VLM (anthropic SDK / claude CLI / dry), strict JSON | plumbing only: no credentials on this Mac, dry mode |
+| autolabel | GBDT trained on 44 CoMind recordings using only features both rigs produce; proposals for review | CV joint attention 0.756±0.034 (full-feature model 0.703), handover 0.604±0.112; playground clip misses handovers from MediaPipe hand-presence shift |
+| metrics | operator numbers: handovers/min, receiver latency, hold, synchrony, idle, speaking, coordination score | CoMind clip: 10 contact handovers (upper bound), score 75 |
+
+Also: `scripts/zed_mac_record.py` (ZED as a UVC webcam on macOS, factory calibration by serial, bundle compatible with `zed_kit.py`), `scripts/intake.py` (SD-card dumps → episodes, chunk concat, session split, drift correction), `scripts/release_episode.py` (face blur, schema, manifest, license, consent), review page (`review.html`, human QA with keyboard shortcuts, proposal accept/reject), annotation page, metrics page.

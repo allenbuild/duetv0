@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Duet EgoExo Playground · annotations</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{--bg:#0E1312;--panel:#151C1A;--line:#26302D;--ink:#E6ECE9;--mute:#8A9591;--accent:#3FA58C;--warn:#D9B64A;--bad:#E06060;--held:#FFD447;--obj:#3EA7FF}
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font-family:"IBM Plex Sans",system-ui,sans-serif;font-size:13px}
+  header{display:flex;align-items:center;gap:18px;padding:10px 16px;border-bottom:1px solid var(--line)}
+  header h1{font-size:15px;margin:0;font-weight:600;letter-spacing:.02em} header h1 span{color:var(--accent)}
+  header a{color:var(--mute);text-decoration:none} header a:hover{color:var(--accent)}
+  .mono{font-family:"IBM Plex Mono",ui-monospace,monospace}
+  select,button{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:5px 9px;font:inherit}
+  button:hover{border-color:var(--accent)}
+  #meta{padding:8px 16px;border-bottom:1px solid var(--line);color:var(--mute);font-size:12px;display:flex;gap:18px;flex-wrap:wrap}
+  main{display:grid;grid-template-columns:minmax(320px,3fr) minmax(0,4fr);gap:10px;padding:10px 16px}
+  #list{display:grid;gap:6px;align-content:start;max-height:calc(100vh - 110px);overflow:auto;padding-right:4px}
+  .item{display:grid;grid-template-columns:150px 1fr;gap:10px;background:var(--panel);border:1px solid var(--line);padding:8px;cursor:pointer;border-radius:4px}
+  .item:hover{border-color:var(--accent)} .item.active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+  .item img{width:150px;aspect-ratio:1.28;object-fit:cover;background:#000;border:1px solid var(--line)}
+  .item .t{color:var(--accent)} .item .sum{margin:3px 0} .item .row{color:var(--mute);font-size:12px}
+  .badge{display:inline-block;padding:1px 6px;border-radius:3px;border:1px solid var(--line);font-size:11px;margin-right:6px;color:var(--mute)}
+  .badge.handover{border-color:var(--held);color:var(--held)} .badge.joint_work{border-color:var(--accent);color:var(--accent)} .badge.request{border-color:var(--obj);color:var(--obj)} .badge.waiting{border-color:var(--warn);color:var(--warn)} .badge.error{border-color:var(--bad);color:var(--bad)}
+  #detail{position:sticky;top:10px;align-self:start;display:grid;gap:10px}
+  #big{width:100%;background:#000;border:1px solid var(--line);display:block}
+  .panel{background:var(--panel);border:1px solid var(--line);padding:10px} .panel h3{margin:0 0 6px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);font-weight:500}
+  table{border-collapse:collapse;width:100%} td,th{padding:3px 6px;border-bottom:1px solid var(--line);text-align:left;font-size:12px;vertical-align:top} th{color:var(--mute);font-weight:500}
+  pre{margin:0;font-size:11px;color:var(--mute);white-space:pre-wrap;max-height:260px;overflow:auto}
+  .empty{color:var(--mute);padding:20px}
+  @media (max-width:900px){main{grid-template-columns:1fr} #list{max-height:none} #detail{position:static}}
+</style>
+</head>
+<body>
+<header>
+  <h1><span>Duet</span> EgoExo Playground · annotations</h1>
+  <label class="mono" style="color:var(--mute)">episode</label>
+  <select id="episode"></select>
+  <nav style="margin-left:auto;display:flex;gap:12px;font-size:12px"><a href="index.html">viewer</a><a href="review.html" id="nav-review">review</a><a href="metrics.html">metrics</a></nav>
+  <button id="reload">Reload</button>
+</header>
+<div id="meta" class="mono"></div>
+<main>
+  <section id="list"></section>
+  <aside id="detail">
+    <img id="big" alt="keyframe contact sheet">
+    <div class="panel"><h3 id="dTitle">keyframe</h3><div id="dSummary" style="margin-bottom:8px"></div><table id="dPersons"><thead><tr><th>person</th><th>action</th><th>holding</th><th>attending to</th></tr></thead><tbody></tbody></table><div id="dHandover" style="margin-top:8px;color:var(--mute)"></div></div>
+    <details class="panel"><summary class="mono" style="cursor:pointer;color:var(--mute)">raw JSON</summary><pre id="dRaw" class="mono"></pre></details>
+  </aside>
+</main>
+<script src="annotate.js"></script>
+</body>
+</html>

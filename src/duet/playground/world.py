@@ -55,7 +55,8 @@ def _gray(path) -> np.ndarray:
 
 def _zed_dir(ep: Episode, s: Stream) -> Path | None:
     d = ep.dir / "zed" / s.name
-    return d if (d / "pose.csv").exists() else None
+    # a ZED folder needs the factory calibration; pose.csv (SDK tracking) is optional (Mac UVC bundles have none)
+    return d if (d / "calibration.json").exists() else None
 
 
 # ----------------------------------------------------------------------------- calib
@@ -159,6 +160,8 @@ def headpose(ep: Episode) -> None:
     for s in ep.egos():
         frames = _frame_list(ep, s); n = len(frames); T = np.full((n, 4, 4), np.nan); backend = None
         zd = _zed_dir(ep, s)
+        if zd is not None and not (zd / "pose.csv").exists():
+            zd = None  # calibration/depth only (Mac recorder): no SDK tracking, fall through to the head tag
         if zd is not None:  # (a) ZED positional tracking, registered to the board via the frame where this camera saw the board
             pose = pd.read_csv(zd / "pose.csv"); t0 = pose.timestamp_ns.min()
             # map processed frames to ZED frames by time: processed frame k is at common_start + k/proc_fps in reference time

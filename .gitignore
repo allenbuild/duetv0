@@ -42,3 +42,8 @@ outputs/*
 # playground working data
 data/playground/*
 !data/playground/.gitkeep
+
+# trained autolabel model ships with the repo (1.6 MB)
+!data/playground/models/
+data/playground/models/*
+!data/playground/models/autolabel_gbdt.pkl
