@@ -13,7 +13,7 @@ dependencies = [
     "pandas>=2.2",
     "pyarrow>=15",
     "pydantic>=2.7",
-    "av>=12",
+    "av>=14.1",  # playground frames/world: av.codec.hwaccel (explicit hwaccel) first ships in 14.1
     "rerun-sdk>=0.20",
     "Pillow>=10",
 ]
@@ -22,6 +22,7 @@ dependencies = [
 dev = [
     "pytest>=8",
     "ruff>=0.6",
+    "httpx>=0.27",  # FastAPI TestClient (tests/test_playground_server.py)
 ]
 # Paired-benchmark ML pipeline (src/duet/ml, scripts/*benchmark*, scripts/baseline_*).
 # Kept optional so the core adapters stay installable without a deep-learning stack.
@@ -39,8 +40,35 @@ perception = [
     "projectaria-tools>=1.5",
 ]
 
+# EgoExo playground (src/duet/playground, scripts/playground.py). System dependencies, not pip-installable:
+# ffmpeg + ffprobe on PATH (required); COLMAP for the opt-in scene_scan stage. Model weights: scripts/playground.py
+# fetch-models (pinned URLs + SHA-256) into $PLAYGROUND_MODELS or data/playground/models.
+playground = [
+    "opencv-python-headless>=4.8",  # 4.7.0 silently computes wrong ChArUco poses
+    # ultralytics pulls opencv-python and mediapipe pulls opencv-contrib-python. All three flavours install the SAME
+    # cv2/ files (whichever is installed last wins), so the >= 4.8 floor is set on every one. Never pip-uninstall one
+    # flavour afterwards: that deletes the shared cv2/ files and breaks `import cv2` for the others. A headless Linux
+    # host needs the system libGL for the GUI flavours (apt install libgl1); pip cannot swap them for -headless.
+    "opencv-python>=4.8",
+    "opencv-contrib-python>=4.8",
+    "mediapipe==0.10.21",  # 1.0.x crashes on macOS Metal (docs/design/egoexo_playground.md)
+    "pupil-apriltags>=1.0.4",
+    "fastapi>=0.115.2",
+    "starlette>=0.39",  # FileResponse Range (206) support; GZip skips video/* and 206 only from starlette 1.5
+    "uvicorn>=0.29",
+    "python-multipart>=0.0.18",  # python_multipart import name; 0.0.18 fixes CVE-2024-53981
+    "ultralytics>=8.2,<9",
+    "transformers>=4.45,<6",  # depth_mono (Depth Anything); revision pinned in code
+    "torch>=2.2",
+    "torchvision>=0.17",  # transformers 5 AutoImageProcessor needs it; each torchvision pins its matching torch
+    "scipy>=1.11",  # imu_arm quaternion slerp
+]
+
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+"duet.playground" = ["static/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
