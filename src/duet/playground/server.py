@@ -167,13 +167,13 @@ def create_app(episodes_root: Path | str | None = None, token: str | None | obje
     cfg = _Config(root.resolve(), tok, _env_mb("PLAYGROUND_MAX_UPLOAD_MB", 8192), _env_mb("PLAYGROUND_MIN_FREE_MB", 2048))
     app = FastAPI(title="Duet ego/exo playground", docs_url=None, redoc_url=None, openapi_url=None, lifespan=_lifespan)
     app.state.pg = cfg
-    app.include_router(router)
-    for _m in pkgutil.iter_modules([str(Path(__file__).parent)]):  # optional API modules (review, metrics, annotate ...)
-        if _m.name.startswith("api_"):
+    for _m in pkgutil.iter_modules([str(Path(__file__).parent)]):  # optional API modules (review, metrics, annotate ...); before the
+        if _m.name.startswith("api_"):  # core router, whose catch-all /api/{rest:path} would otherwise answer 404 first
             try:
                 app.include_router(importlib.import_module(f"duet.playground.{_m.name}").router)
             except Exception as _e:  # noqa: BLE001
                 print(f"playground: api module {_m.name} not mounted: {_e}")
+    app.include_router(router)
     app.add_exception_handler(Exception, _internal_error)
     app.mount("/", StaticFiles(directory=str(STATIC), html=True), name="static")
     app.add_middleware(_GZipExceptMedia)

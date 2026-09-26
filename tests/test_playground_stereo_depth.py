@@ -163,10 +163,10 @@ def test_depth_png_units_and_indexing_helpers(tmp_path):
 
 
 def test_stage_end_to_end(tmp_path):
-    bundle = tmp_path / "bundle"; gt, near = write_bundle(bundle, n_frames=30)
+    bundle = tmp_path / "bundle"; gt, near = write_bundle(bundle, n_frames=180)  # 6 s: align needs >= 5 s of common window
     assert zed_bundle.is_bundle(bundle)
     root = tmp_path / "episodes"; left = zed_bundle.ingest(bundle, root / "ep", "leader")
-    ep = Episode.create(root, "ep", [("leader", "ego", left, "p1"), ("other", "ego", bundle / "left.mp4", "p2")]); ep.proc_fps = 5.0; ep.save()
+    ep = Episode.create(root, "ep", [("leader", "ego", left, "p1"), ("other", "ego", bundle / "left.mp4", "p2")], offsets={"other": 0.0}); ep.proc_fps = 5.0; ep.save()
     probe(ep); align(ep); extract_frames(ep)
     n = len(sorted((ep.derived / "frames" / "leader").glob("*.jpg"))); assert n >= 4
     SD.stereo_depth(ep)
@@ -196,7 +196,7 @@ def test_stage_end_to_end(tmp_path):
 
 
 def test_skips_without_stereo_block(tmp_path):
-    bundle = tmp_path / "bundle"; write_bundle(bundle, n_frames=6)
+    bundle = tmp_path / "bundle"; write_bundle(bundle, n_frames=180)
     c = json.load(open(bundle / "calibration.json")); c.pop("stereo"); json.dump(c, open(bundle / "calibration.json", "w"))
     root = tmp_path / "episodes"; left = zed_bundle.ingest(bundle, root / "ep", "leader")
     ep = Episode.create(root, "ep", [("leader", "ego", left, None)]); ep.proc_fps = 5.0; ep.save()

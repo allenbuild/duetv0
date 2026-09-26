@@ -51,8 +51,8 @@ from . import runtime
 
 SCHEMA_VERSION = 2
 # every stage in execution order; run.py builds its registry from this (single source of truth)
-STAGES = ("probe", "align", "frames", "calib", "stereo_depth", "body2d", "track", "hands", "objects", "contact", "tags", "headpose", "body3d",
-          "depth_mono", "scene_scan", "world3d", "gaze_proxy", "speech", "qc", "imu_arm", "annotate", "autolabel", "metrics", "export")
+STAGES = ("probe", "align", "frames", "calib", "stereo_depth", "body2d", "hands", "objects", "contact", "tags", "headpose", "body3d",
+          "depth_mono", "scene_scan", "world3d", "track", "gaze_proxy", "speech", "qc", "imu_arm", "annotate", "autolabel", "metrics", "export")
 OPT_IN_STAGES = ("depth_mono", "scene_scan")  # run only when named explicitly
 STATES = ("done", "skipped", "failed", "running", "interrupted", "stale")
 FINISHED_STATES = ("done", "skipped", "failed", "interrupted")

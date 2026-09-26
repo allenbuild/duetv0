@@ -33,7 +33,7 @@ import numpy as np
 from .episode import Episode
 from .perception import _frame_list
 
-DEFAULT_MODEL = {"anthropic": "claude-haiku-4-5-20251001", "claude_cli": None, "dry": None}
+DEFAULT_MODEL = {"anthropic": "claude-haiku-4-5-20251001", "claude_cli": None, "codex_cli": None, "dry": None}
 CLI_TIMEOUT_S = 240.0
 CLI_PROBE_TIMEOUT_S = 90.0
 COORDINATION = ("none", "request", "handover", "joint_work", "waiting")
@@ -170,11 +170,60 @@ def call_claude_cli(image: Path, prompt: str, model: str | None) -> tuple[str, d
     return str(j.get("result", "")), meta
 
 
+def call_codex_cli(image: Path, prompt: str, model: str | None) -> tuple[str, dict]:
+    """OpenAI Codex CLI (``codex exec -i <image> --json``), authenticated by the machine's ChatGPT login (``codex login``).
+    The JSONL event stream is parsed for the final agent message; the model defaults to the CLI's own default (-m overrides)."""
+    cmd = ["codex", "exec", "--json", "--skip-git-repo-check", "-s", "read-only", "-i", str(Path(image).resolve())]
+    if model:
+        cmd += ["-m", model]
+    cmd.append("Look at the attached image carefully. Then:\n\n" + prompt)
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=CLI_TIMEOUT_S, env=_cli_env(), cwd=str(Path(image).resolve().parent))
+    text, meta, errors = "", {"events": 0}, []
+    for line in r.stdout.splitlines():
+        try:
+            ev = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        meta["events"] += 1
+        item = ev.get("item") or {}
+        if ev.get("type") == "item.completed" and item.get("type") == "agent_message":
+            text = item.get("text") or text
+        elif ev.get("type") in ("turn.failed", "error"):
+            errors.append(str(ev.get("error") or ev.get("message") or ev)[:200])
+        elif ev.get("type") == "turn.completed":
+            u = ev.get("usage") or {}; meta.update({"input_tokens": u.get("input_tokens"), "output_tokens": u.get("output_tokens"), "cached_input_tokens": u.get("cached_input_tokens")})
+    if errors or (not text and r.returncode != 0):
+        raise RuntimeError(f"codex CLI error (rc={r.returncode}): {'; '.join(errors) or (r.stderr or r.stdout)[:200]}")
+    if not text:
+        raise RuntimeError(f"codex CLI returned no agent message (rc={r.returncode}): {(r.stderr or r.stdout)[:200]}")
+    return text, meta
+
+
 def call_dry(image: Path, prompt: str, model: str | None) -> tuple[str, dict]:
-    return json.dumps(empty_annotation("dry backend: no model was called (set ANTHROPIC_API_KEY or log in the claude CLI)")), {}
+    return json.dumps(empty_annotation("dry backend: no model was called (set ANTHROPIC_API_KEY, or log in the claude or codex CLI)")), {}
 
 
-BACKENDS: dict[str, BackendFn] = {"anthropic": call_anthropic, "claude_cli": call_claude_cli, "dry": call_dry}
+BACKENDS: dict[str, BackendFn] = {"anthropic": call_anthropic, "claude_cli": call_claude_cli, "codex_cli": call_codex_cli, "dry": call_dry}
+_codex_probe: tuple[bool, str] | None = None
+
+
+def codex_available(force: bool = False) -> tuple[bool, str]:
+    """Is the OpenAI Codex CLI installed and logged in (``codex login status``)? Cached per process."""
+    global _codex_probe
+    if _codex_probe is not None and not force:
+        return _codex_probe
+    try:
+        r = subprocess.run(["codex", "login", "status"], capture_output=True, text=True, timeout=CLI_PROBE_TIMEOUT_S, env=_cli_env())
+        out = (r.stdout + r.stderr).strip()
+        ok = r.returncode == 0 and "logged in" in out.lower() and "not logged in" not in out.lower()
+        _codex_probe = (ok, "ok" if ok else f"codex CLI: {out[:120] or 'unknown login state'}")
+    except FileNotFoundError:
+        _codex_probe = (False, "codex CLI not installed")
+    except subprocess.TimeoutExpired:
+        _codex_probe = (False, "codex CLI probe timed out")
+    except Exception as e:  # noqa: BLE001
+        _codex_probe = (False, f"codex CLI probe failed: {type(e).__name__}: {str(e)[:120]}")
+    return _codex_probe
 _cli_probe: tuple[bool, str] | None = None
 
 
@@ -208,7 +257,10 @@ def select_backend(requested: str | None = None) -> tuple[str, str]:
     ok, why = cli_available()
     if ok:
         return "claude_cli", "claude CLI answers headlessly"
-    return "dry", f"no ANTHROPIC_API_KEY; {why}"
+    ok2, why2 = codex_available()
+    if ok2:
+        return "codex_cli", "codex CLI is logged in"
+    return "dry", f"no ANTHROPIC_API_KEY; {why}; {why2}"
 
 
 # ----------------------------------------------------------------------------- options

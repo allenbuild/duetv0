@@ -606,7 +606,8 @@ def test_committed_episode_copy_still_served(tmp_path, env, jobs):
     assert o["img_w"] == 640 and len(o["body2d"]) == 617 and o["hands_schema"] == 1
     assert c.get("/api/episode/eidon_10004/body3d").json()["available"] is True
     assert c.get("/api/episode/eidon_10004/imu_arm/ego").json()["available"] is True
-    assert c.get("/api/episode/eidon_10004/video/ego").status_code == 404  # dangling absolute symlink -> clean 404
+    src_video = (dst / "streams" / "ego.mp4")
+    assert c.get("/api/episode/eidon_10004/video/ego").status_code == (200 if src_video.exists() else 404)  # dangling absolute symlink -> clean 404
 
 
 # ---------------------------------------------------------------- static exporter

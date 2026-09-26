@@ -102,9 +102,10 @@ def test_metrics_stage_on_synthetic_episode(tmp_path):
 @pytest.mark.skipif(not (COMIND / "derived/hands/leader.npz").exists(), reason="CoMind playground episode not present")
 def test_metrics_api_on_comind_clip():
     from fastapi.testclient import TestClient
-    from duet.playground.server import app
+    from duet.playground.server import create_app
+    app = create_app(token=None); LOCAL = {"base_url": "http://127.0.0.1:8765", "client": ("127.0.0.1", 50000)}
     ep = Episode.load(COMIND); M.metrics(ep)
-    r = TestClient(app).get("/api/episode/comind_43276420_clip/metrics"); assert r.status_code == 200; s = r.json()
+    r = TestClient(app, **LOCAL).get("/api/episode/comind_43276420_clip/metrics"); assert r.status_code == 200; s = r.json()
     assert s["available"] and s["persons"] == ["leader", "helper"] and 40 < s["duration_s"] < 50 and s["n_frames"] == 466
     for p in ("leader", "helper"):
         assert 0.5 < s["hand_speed"][p]["hands_visible_fraction"] <= 1.0 and 0 <= s["hand_speed"][p]["idle_fraction"] <= 1
@@ -114,4 +115,4 @@ def test_metrics_api_on_comind_clip():
         if e["synchrony"] is not None:
             assert -1 <= e["synchrony"] <= 1
     assert s["coordination_score"]["score"] is None or 0 <= s["coordination_score"]["score"] <= 100
-    assert TestClient(app).get("/api/episode/does_not_exist/metrics").status_code == 404
+    assert TestClient(app, **LOCAL).get("/api/episode/does_not_exist/metrics").status_code == 404

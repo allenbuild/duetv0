@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 import intake as I
 
-from duet.playground.align import _audio_envelope
+from intake import _audio_envelope
 
 CLIPS = ROOT / "data/playground/clips"
 ORIG = ROOT / "data/playground/episodes/comind_43276420_clip"
@@ -150,7 +150,7 @@ def test_sd_dump_intake_reproduces_original_episode(tmp_path, capsys):
     I.main(args + ["--dry-run"])
     assert "dry run" in capsys.readouterr().out and not (tmp_path / "eps").exists()
     I.main(args + ["--run", "--stages", "probe,align"])
-    eps = sorted((tmp_path / "eps").iterdir())
+    eps = sorted(p for p in (tmp_path / "eps").iterdir() if not p.name.startswith("."))  # Episode.create keeps a .staging dir
     assert [e.name for e in eps] == ["tmp_intake_1"]
     ep = json.load(open(eps[0] / "episode.json"))
     assert len(ep["streams"]) == 4 and ep["reference"] == "cam_leader"

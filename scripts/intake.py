@@ -38,7 +38,34 @@ from pathlib import Path
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]; sys.path.insert(0, str(ROOT / "src"))
-from duet.playground.align import HOP, SR, _audio_envelope, _xcorr_lag
+SR, HOP = 8000, 80  # 10 ms hops (same envelope as the playground's first aligner; kept local, align.py has moved on)
+
+
+def _audio_envelope(path):
+    """Onset-strength envelope (10 ms hops) of a video's audio, or None without decodable audio."""
+    import subprocess, tempfile
+    with tempfile.TemporaryDirectory() as td:
+        wav = Path(td) / "a.f32"
+        r = subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", str(path), "-vn", "-ac", "1", "-ar", str(SR), "-f", "f32le", str(wav)], capture_output=True)
+        if r.returncode != 0 or not wav.exists() or wav.stat().st_size < SR * 4:
+            return None
+        x = np.fromfile(wav, np.float32)
+    n = len(x) // HOP
+    e = np.log1p((x[: n * HOP].reshape(n, HOP) ** 2).sum(1) * 1e3)
+    onset = np.diff(e, prepend=e[:1]); onset[onset < 0] = 0
+    onset -= onset.mean(); onset /= (onset.std() + 1e-9)
+    return onset
+
+
+def _xcorr_lag(ref, sig, max_lag):
+    """(lag in hops, confidence); lag > 0 means sig starts later than ref."""
+    n = min(len(ref), len(sig)); ref, sig = ref[:n], sig[:n]
+    L = int(2 ** np.ceil(np.log2(2 * n)))
+    cc = np.fft.irfft(np.fft.rfft(ref, L) * np.conj(np.fft.rfft(sig, L)), L)
+    cc = np.concatenate([cc[-max_lag:], cc[: max_lag + 1]]); lags = np.arange(-max_lag, max_lag + 1)
+    best = int(np.argmax(cc)); peak = cc[best]; mask = np.abs(lags - lags[best]) > 50
+    second = cc[mask].max() if mask.any() else 1e-9
+    return int(lags[best]), float(peak / max(second, 1e-9))
 from duet.playground.episode import Episode
 
 EPISODES = ROOT / "data/playground/episodes"

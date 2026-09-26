@@ -85,7 +85,6 @@ SPECS: dict[str, StageSpec] = {
     "calib": StageSpec(_P + "world:calib", deps=("frames",), outputs=("calib",), config=(*_TL, "rig", "zed"), sources=_GEO),
     "stereo_depth": StageSpec(_P + "stereo_depth:stereo_depth", deps=("frames", "calib"), outputs=("stereo_depth",), config=(*_TL, "zed"), sources=_GEO),
     "body2d": StageSpec(_P + "perception:body2d", deps=("frames",), outputs=("body2d",), config=_TL, models=("yolov8n-pose.pt",)),
-    "track": StageSpec(_P + "track:track", deps=("frames", "body2d"), uses=("calib", "world3d"), outputs=("track",), config=(*_TL, "persons")),
     "hands": StageSpec(_P + "perception:hands", deps=("frames",), uses=("body2d",), outputs=("hands",), config=(*_TL, "persons"),
                        models=("hand_landmarker.task",)),  # body2d optional: without it, geometric wearer cues only
     "objects": StageSpec(_P + "perception:objects", deps=("frames",), outputs=("objects",), config=_TL,
@@ -102,6 +101,7 @@ SPECS: dict[str, StageSpec] = {
                             config=(*_TL, "rig"), sources=_GEO, opt_in=True),
     "world3d": StageSpec(_P + "world:world3d", deps=("frames", "calib"), uses=("body2d", "hands", "tags", "headpose"),
                          outputs=("world3d",), config=(*_TL, "persons", "rig", "zed"), sources=_GEO),
+    "track": StageSpec(_P + "track:track", deps=("frames", "body2d"), uses=("calib", "world3d"), outputs=("track",), config=(*_TL, "persons")),
     "gaze_proxy": StageSpec(_P + "gaze_proxy:gaze_proxy", deps=("frames",), uses=("calib", "body2d", "objects", "tags", "headpose", "world3d"),
                             outputs=("gaze_proxy",), config=(*_TL, "persons", "rig"), sources=_GEO),
     "speech": StageSpec(_P + "speech:speech", deps=("align", "frames"), outputs=("speech",), config=(*_TL, "persons"), reads_sources=True),

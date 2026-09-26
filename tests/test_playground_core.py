@@ -543,8 +543,9 @@ def test_registry_is_lazy_and_consistent():
     out = subprocess.run([sys.executable, "-c", code],
                          capture_output=True, text=True, env={**os.environ, "PYTHONPATH": str(SRC)}, check=True)
     assert out.stdout.split() == ["0", "0", "0"]
-    assert tuple(R.SPECS) == STAGES and R.DEFAULT_ORDER == ["probe", "align", "frames", "calib", "body2d", "hands", "objects", "tags", "headpose",
-                                                             "body3d", "world3d", "qc", "imu_arm", "export"]
+    assert tuple(R.SPECS) == STAGES and R.DEFAULT_ORDER == ["probe", "align", "frames", "calib", "stereo_depth", "body2d", "hands", "objects", "contact",
+                                                             "tags", "headpose", "body3d", "world3d", "track", "gaze_proxy", "speech", "qc", "imu_arm",
+                                                             "annotate", "autolabel", "metrics", "export"]
     assert set(R.ALL_STAGES) - set(R.DEFAULT_ORDER) == {"depth_mono", "scene_scan"}
     for st, deps in R.DEPS.items():
         assert all(R.ALL_STAGES.index(d) < R.ALL_STAGES.index(st) for d in (*deps, *R.USES[st]))
@@ -1013,7 +1014,8 @@ def test_legacy_episode_with_dangling_links_keeps_everything(tmp_path):
     assert R.missing_sources(ep) == ["ego"]
     assert all(after[k] == v for k, v in before.items() if v.get("state") == "done"), "a legacy result was rewritten"
     assert {k for k, v in res.items() if v == "cached"} == {k for k, v in before.items() if v.get("state") == "done"}
-    assert calls == ["calib"] and {k: after[k]["state"] for k in ("tags", "headpose", "world3d")} == dict.fromkeys(("tags", "headpose", "world3d"), "skipped")
+    NEW = {"stereo_depth", "track", "contact", "gaze_proxy", "speech", "annotate", "autolabel", "metrics"}  # stages added after this legacy episode was committed
+    assert calls[0] == "calib" and set(calls[1:]) <= NEW and {k: after[k]["state"] for k in ("tags", "headpose", "world3d")} == dict.fromkeys(("tags", "headpose", "world3d"), "skipped")
     assert R.fresh_stages(ep, specs) == fresh0 >= {"probe", "align", "frames", "body2d", "hands", "export"}
 
 

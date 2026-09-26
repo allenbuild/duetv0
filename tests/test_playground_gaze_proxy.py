@@ -91,7 +91,8 @@ def test_skips_cleanly_without_evidence(tmp_path):
 
 def test_helpers():
     intr = GP.G.Intrinsics.nominal(640, 640, 110.0)
-    assert GP.pixel_angle_deg(intr, np.array([[320.0, 320.0], [320 + intr.K[0, 0], 320.0]])).tolist() == pytest.approx([0.0, 45.0], abs=1e-4)
+    cx, cy = intr.K[0, 2], intr.K[1, 2]
+    assert GP.pixel_angle_deg(intr, np.array([[cx, cy], [cx + intr.K[0, 0], cy]])).tolist() == pytest.approx([0.0, 45.0], abs=1e-4)
     assert GP.angle_between_deg(np.array([[1.0, 0, 0]]), np.array([[0, 1.0, 0]]))[0] == pytest.approx(90.0)
     kp = np.full((1, 4, 17, 3), np.nan, np.float32); kp[0, 3, 0] = [10, 20, 0.9]; kp[0, 3, 1] = [12, 18, 0.2]
     assert GP.partner_head_px(kp)[0].tolist() == [10, 20]

@@ -136,7 +136,8 @@ def test_stage_entry_point_reads_options(ep, monkeypatch):
 def test_select_backend(monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.setattr(A, "cli_available", lambda force=False: (False, "not logged in"))
-    assert A.select_backend() == ("dry", "no ANTHROPIC_API_KEY; not logged in")
+    monkeypatch.setattr(A, "codex_available", lambda force=False: (False, "codex CLI: Not logged in"))
+    assert A.select_backend() == ("dry", "no ANTHROPIC_API_KEY; not logged in; codex CLI: Not logged in")
     monkeypatch.setattr(A, "cli_available", lambda force=False: (True, "ok"))
     assert A.select_backend()[0] == "claude_cli"
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
