@@ -5,17 +5,23 @@ import threading
 import traceback
 from pathlib import Path
 
-from . import align as _align, episode as _ep, export as _export, imu_arm as _imu, perception as _p, qc as _qc
+from . import align as _align, depth_mono as _dm, episode as _ep, export as _export, imu_arm as _imu, perception as _p, qc as _qc, scene_scan as _sc, world as _w
 
 STAGE_FUNCS = {
     "probe": _ep.probe,
     "align": _align.align,
     "frames": _p.extract_frames,
+    "calib": _w.calib,          # intrinsics + board registration (world = board)
     "body2d": _p.body2d,
     "hands": _p.hands,
     "objects": _p.objects,
-    "body3d": _p.body3d,
+    "tags": _w.tags,            # AprilTags in fixed views -> world poses
+    "headpose": _w.headpose,    # ego camera pose per frame: ZED tracking or head tag
+    "body3d": _p.body3d,        # monocular fallback
+    "world3d": _w.world3d,      # triangulated bodies, metric hands, objects, cross-person features
     "imu_arm": _imu.imu_arm,
+    "depth_mono": _dm.depth_mono,
+    "scene_scan": _sc.scene_scan,
     "qc": _qc.qc,
     "export": _export.export,
 }

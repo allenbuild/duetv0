@@ -48,6 +48,16 @@
   <span style="flex:1"></span>
   <span class="legend"><span><i style="background:var(--left)"></i>left hand</span><span><i style="background:var(--right)"></i>right hand</span><span><i style="background:var(--body)"></i>body</span><span><i style="background:var(--obj)"></i>object</span><span><i style="background:var(--held)"></i>held</span></span>
 </header>
+<details id="uploader" style="padding:8px 16px;border-bottom:1px solid var(--line)">
+  <summary class="mono" style="cursor:pointer;color:var(--accent)">+ New episode from your videos</summary>
+  <form id="uploadForm" style="display:grid;gap:8px;padding:10px 0;max-width:720px">
+    <label>Episode name <input id="upName" required placeholder="dorm_handovers_01" style="background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:5px 8px;font:inherit;width:260px"></label>
+    <label>Videos (each camera one file; every file needs audio for sync) <input id="upFiles" type="file" accept="video/*,.mp4,.mov,.mkv" multiple required></label>
+    <div id="upRows" style="display:grid;gap:4px"></div>
+    <div style="display:flex;gap:10px;align-items:center"><button type="submit" class="primary">Upload and run</button><span id="upStatus" class="mono" style="color:var(--mute)"></span></div>
+    <p style="color:var(--mute);font-size:11px;margin:0;max-width:66ch">Files are stored on this server and processed here (about 6 min per 50 s of 4-camera footage on a laptop; faster with a GPU). Clap once at the start of every take.</p>
+  </form>
+</details>
 <div id="stages"></div>
 <div id="transport">
   <button id="play">Play</button>

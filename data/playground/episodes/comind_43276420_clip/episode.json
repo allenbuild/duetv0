@@ -112,14 +112,47 @@
   "qc": {
    "state": "done",
    "detail": "min good-frame 0.95",
-   "started": 1790349845.242121,
-   "finished": 1790349851.3597708
+   "started": 1790392604.3500009,
+   "finished": 1790392610.3871942
   },
   "export": {
    "state": "done",
-   "detail": "466 rows x 50 columns -> derived/records.parquet",
-   "started": 1790349851.360449,
-   "finished": 1790349851.651906
+   "detail": "466 rows x 64 columns -> derived/records.parquet",
+   "started": 1790392825.0061052,
+   "finished": 1790392825.1120079
+  },
+  "calib": {
+   "state": "skipped",
+   "detail": "board not seen by any camera; no world frame",
+   "started": 1790392577.9705229
+  },
+  "tags": {
+   "state": "skipped",
+   "detail": "no tags seen (no fixed cameras registered, or no tags in view)",
+   "started": 1790392578.724064
+  },
+  "headpose": {
+   "state": "skipped",
+   "detail": "leader: None (0% frames); helper: None (0% frames)",
+   "started": 1790392581.5652852
+  },
+  "world3d": {
+   "state": "done",
+   "detail": "triangulated body coverage 0%; features ['head_dist_m', 'min_wrist_dist_m', 'leader_facing_partner_cos', 'helper_facing_partner_cos']",
+   "started": 1790392581.5696352,
+   "finished": 1790392581.5904052
+  },
+  "depth_mono": {
+   "state": "done",
+   "detail": "leader (0/94 frames metric); helper (0/94 frames metric)",
+   "started": 1790392581.59083,
+   "finished": 1790392603.801476
+  },
+  "scene_scan": {
+   "state": "skipped",
+   "detail": "no fixed camera registered to the board",
+   "started": 1790392825.00497,
+   "finished": 1790392604.348187
   }
  },
  "common_start_s": 1.67,

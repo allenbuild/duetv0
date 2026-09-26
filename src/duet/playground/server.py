@@ -5,7 +5,10 @@ import json
 from pathlib import Path
 
 import numpy as np
-from fastapi import FastAPI, HTTPException
+import re
+import shutil
+
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -64,6 +67,34 @@ def run(name: str, stages: str = "", force: bool = False):
     return {"started": ok}
 
 
+@app.post("/api/upload")
+async def upload(name: str = Form(...), roles: str = Form(...), persons: str = Form(""), reference: str = Form(""), fps: float = Form(10.0),
+                 files: list[UploadFile] = File(...)):
+    """Create an episode from uploaded videos and start the pipeline.
+
+    roles/persons are comma-separated, one per file, in file order. Stream names come from the
+    filenames (sanitised). The first ego stream is the time reference unless `reference` is given.
+    """
+    name = re.sub(r"[^A-Za-z0-9_-]+", "_", name.strip())[:64] or "episode"
+    if (EPISODES / name).exists():
+        raise HTTPException(409, f"episode {name} exists")
+    role_list = [r.strip() for r in roles.split(",")]; person_list = [p.strip() or None for p in persons.split(",")] if persons else [None] * len(files)
+    if len(role_list) != len(files):
+        raise HTTPException(400, "one role per file")
+    tmp = EPISODES / f"_upload_{name}"; tmp.mkdir(parents=True, exist_ok=True)
+    videos = []
+    for f, role, person in zip(files, role_list, person_list):
+        stem = re.sub(r"[^A-Za-z0-9_-]+", "_", Path(f.filename).stem)[:32] or "stream"
+        dst = tmp / f"{stem}{Path(f.filename).suffix.lower() or '.mp4'}"
+        with open(dst, "wb") as out:
+            shutil.copyfileobj(f.file, out, 16 << 20)
+        videos.append((stem, role if role in ("ego", "exo") else "exo", dst, person))
+    ep = Episode.create(EPISODES, name, videos, None, reference or None, link=False)
+    ep.proc_fps = fps; ep.save(); shutil.rmtree(tmp, ignore_errors=True)
+    run_in_background(ep.dir, None, False)
+    return {"name": ep.name, "streams": [s.name for s in ep.streams]}
+
+
 @app.get("/api/episode/{name}/video/{stream}")
 def video(name: str, stream: str):
     ep = _ep(name); s = ep.stream(stream)
@@ -96,6 +127,29 @@ def body3d(name: str):
         return {"available": False}
     b = np.load(z)
     return JSONResponse({"available": True, "stream": str(b["stream"]), "proc_fps": ep.proc_fps, "world": _clean(np.round(b["world"], 4))})
+
+
+@app.get("/api/episode/{name}/world3d")
+def world3d(name: str):
+    ep = _ep(name); z = ep.derived / "world3d" / "world3d.npz"
+    if not z.exists():
+        return {"available": False}
+    w = np.load(z); out = {"available": True, "proc_fps": ep.proc_fps, "bodies": _clean(np.round(w["bodies"], 4))}
+    for key in w.files:
+        if key.startswith(("head_", "object_", "hands3d_")):
+            out[key] = _clean(np.round(w[key], 4))
+        if key.startswith("feat_"):
+            out[key] = _clean(np.round(w[key], 4))
+    c = ep.derived / "calib" / "calib.json"
+    if c.exists():
+        out["cameras"] = {k: v["T_world_cam"] for k, v in json.load(open(c))["cameras"].items() if v["T_world_cam"] is not None}
+    hp = {}
+    for s in ep.egos():
+        z2 = ep.derived / "headpose" / f"{s.name}.npz"
+        if z2.exists():
+            hp[s.name] = str(np.load(z2)["backend"])
+    out["headpose_backends"] = hp
+    return JSONResponse(out)
 
 
 @app.get("/api/episode/{name}/imu_arm/{stream}")

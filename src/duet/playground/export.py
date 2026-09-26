@@ -56,6 +56,20 @@ def export(ep: Episode) -> None:
             q = np.load(z)
             for key in ("sharp", "bright", "motion"):
                 cols[f"{s.name}_qc_{key}"] = q[key][:n]
+    z = ep.derived / "world3d" / "world3d.npz"
+    if z.exists():
+        w3 = np.load(z)
+        for p in range(w3["bodies"].shape[1]):
+            cols[f"world_body_p{p}"] = list(w3["bodies"][:n, p].reshape(n, -1))
+        for key in w3.files:
+            if key.startswith(("hands3d_", "head_", "object_")):
+                cols[f"world_{key}"] = list(w3[key][:n].reshape(n, -1))
+            if key.startswith("feat_"):
+                cols[key[5:]] = w3[key][:n]
+    for s in ep.egos():
+        z = ep.derived / "headpose" / f"{s.name}.npz"
+        if z.exists():
+            hp = np.load(z); cols[f"{s.name}_T_world_cam"] = list(hp["T_world_cam"][:n].reshape(n, -1)); cols[f"{s.name}_headpose_backend"] = [str(hp["backend"])] * n
     z = ep.derived / "body3d" / "body3d.npz"
     if z.exists():
         b = np.load(z); w = b["world"][:n]

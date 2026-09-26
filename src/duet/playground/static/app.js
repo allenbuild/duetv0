@@ -6,7 +6,8 @@ const HAND = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,1
 const MP33 = [[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[23,25],[25,27],[24,26],[26,28],[0,11],[0,12]];
 const C = {left:"#57E39B", right:"#FF6B6B", body:"#B58CFF", obj:"#3EA7FF", held:"#FFD447", accent:"#3FA58C", mute:"#8A9591"};
 
-let ep = null, overlays = {}, body3d = null, imuArm = {}, views = {}, playing = false, t = 0, master = null, raf = 0, three = null;
+let ep = null, overlays = {}, body3d = null, world3d = null, imuArm = {}, views = {}, playing = false, t = 0, master = null, raf = 0, three = null;
+const COCO17 = [[5,7],[7,9],[6,8],[8,10],[5,6],[5,11],[6,12],[11,12],[11,13],[13,15],[12,14],[14,16],[0,5],[0,6]];
 
 async function api(path, opts) { const r = await fetch(path, opts); return r.json(); }
 
@@ -31,6 +32,7 @@ async function loadEpisode(name) {
   // overlays, 3D, IMU load lazily in the background
   for (const s of ep.streams) api(`/api/episode/${name}/overlay/${s.name}`).then((o) => { overlays[s.name] = o; draw(); });
   api(`/api/episode/${name}/body3d`).then((b) => { body3d = b.available ? b : null; setupThree(); });
+  api(`/api/episode/${name}/world3d`).then((w) => { world3d = w.available ? w : null; setupThree(); });
   for (const s of ep.streams) if (s.imu) api(`/api/episode/${name}/imu_arm/${s.name}`).then((a) => { if (a.available) { imuArm[s.name] = a; setupThree(); } });
 }
 
@@ -97,9 +99,9 @@ function setupThree() {
     const grid = new THREE.GridHelper(3, 12, 0x26302d, 0x1a2220); scene.add(grid); scene.add(new THREE.AxesHelper(0.3));
     three = { renderer, scene, camera, lines: [] };
   }
-  const has3d = !!body3d, hasImu = Object.keys(imuArm).length > 0;
-  $("#threeTitle").textContent = has3d ? `3D body · monocular from ${body3d.stream}` : hasImu ? "3D arms · IMU harness (Eidon 7-slot)" : "3D";
-  $("#threeNote").textContent = has3d ? "MediaPipe world landmarks: metres, hip-centred, single camera. Not triangulated." : hasImu ? "Arm chain from sensor quaternions, chest-relative (ported from Eidon Sim)." : "run body3d or add IMU";
+  const has3d = !!body3d, hasImu = Object.keys(imuArm).length > 0, hasWorld = !!world3d;
+  $("#threeTitle").textContent = hasWorld ? "3D · world frame (board): triangulated bodies, heads, objects" : has3d ? `3D body · monocular from ${body3d.stream}` : hasImu ? "3D arms · IMU harness (Eidon 7-slot)" : "3D";
+  $("#threeNote").textContent = hasWorld ? `metres in the board frame. heads: ${Object.entries(world3d.headpose_backends || {}).map(([k, v]) => k + "=" + v).join(", ") || "none"}` : has3d ? "MediaPipe world landmarks: metres, hip-centred, single camera. Not triangulated." : hasImu ? "Arm chain from sensor quaternions, chest-relative (ported from Eidon Sim)." : "run body3d or add IMU";
   drawThree();
 }
 function segLines(pairs, pts, color) { const g = new THREE.BufferGeometry(); const arr = []; for (const [a, b] of pairs) { if (!pts[a] || !pts[b] || pts[a][0] == null || pts[b][0] == null) continue; arr.push(...pts[a], ...pts[b]); }
@@ -107,7 +109,17 @@ function segLines(pairs, pts, color) { const g = new THREE.BufferGeometry(); con
 function drawThree() {
   if (!three) return; for (const l of three.lines) three.scene.remove(l); three.lines = [];
   const k = frameIndex();
-  if (body3d && body3d.world[k]) for (const person of body3d.world[k]) { if (person[0][0] == null) continue;
+  if (world3d) {
+    // board frame: X right, Y down the board, Z into the board. Scene: x = X, up = -Z, z = Y
+    const toScene = (p) => (p == null || p[0] == null ? null : [p[0], -p[2], p[1]]);
+    if (world3d.bodies[k]) for (const person of world3d.bodies[k]) { const pts = person.map(toScene); if (pts.every((p) => p == null)) continue; const l = segLines(COCO17, pts, 0xb58cff); three.scene.add(l); three.lines.push(l); }
+    for (const key of Object.keys(world3d)) {
+      if (key.startsWith("head_") && world3d[key][k] && world3d[key][k][0] != null) { const g = new THREE.SphereGeometry(0.06, 12, 12); const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: key.includes("leader") ? 0x8fa3cb : 0xe39468 })); const p = toScene(world3d[key][k]); m.position.set(...p); three.scene.add(m); three.lines.push(m); }
+      if (key.startsWith("object_") && world3d[key][k] && world3d[key][k][0] != null) { const g = new THREE.BoxGeometry(0.05, 0.05, 0.05); const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: 0xffd447 })); const p = toScene(world3d[key][k]); m.position.set(...p); three.scene.add(m); three.lines.push(m); }
+      if (key.startsWith("hands3d_") && world3d[key][k]) for (const hand of world3d[key][k]) { const pts = hand.map(toScene); if (pts.every((p) => p == null)) continue; const l = segLines(HAND, pts, 0x57e39b); three.scene.add(l); three.lines.push(l); }
+    }
+    for (const [name, T] of Object.entries(world3d.cameras || {})) { const g = new THREE.ConeGeometry(0.04, 0.08, 8); const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: 0x8a9591 })); const p = toScene([T[0][3], T[1][3], T[2][3]]); m.position.set(...p); three.scene.add(m); three.lines.push(m); }
+  } else if (body3d && body3d.world[k]) for (const person of body3d.world[k]) { if (person[0][0] == null) continue;
     // MediaPipe world: x right, y down, z toward camera (metres) -> scene: x, up = -y, z
     const pts = person.map((p) => (p[0] == null ? null : [p[0], -p[1] + 0.9, p[2]])); const l = segLines(MP33, pts, 0xb58cff); three.scene.add(l); three.lines.push(l); }
   for (const a of Object.values(imuArm)) { const tt = ep.common_start_s + t; let i = 0, lo = 0, hi = a.t_s.length - 1; while (lo < hi) { i = (lo + hi) >> 1; if (a.t_s[i] < tt) lo = i + 1; else hi = i; } const pts = a.points[lo]; if (!pts) continue;
@@ -127,3 +139,21 @@ async function pollStatus() { const name = ep.name; const d = await api(`/api/ep
   if (d.running) setTimeout(pollStatus, 2000); else if (wasRunning) loadEpisode(name); }
 window.addEventListener("resize", draw);
 loadEpisodes();
+
+/* ---------------- upload ---------------- */
+$("#upFiles").addEventListener("change", (e) => {
+  const rows = $("#upRows"); rows.innerHTML = "";
+  for (const f of e.target.files) { const r = document.createElement("div"); r.className = "mono"; r.style.cssText = "display:flex;gap:8px;align-items:center;font-size:12px";
+    r.innerHTML = `<span style="min-width:220px;overflow:hidden;text-overflow:ellipsis">${f.name}</span><select class="upRole"><option value="ego">ego (head camera)</option><option value="exo">exo (fixed camera)</option></select><input class="upPerson" placeholder="who wears it (ego)" style="background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:3px 6px;font:inherit;width:160px">`; rows.appendChild(r); }
+});
+$("#uploadForm").addEventListener("submit", async (e) => {
+  e.preventDefault(); const files = $("#upFiles").files; if (!files.length) return;
+  const fd = new FormData(); fd.append("name", $("#upName").value);
+  fd.append("roles", Array.from(document.querySelectorAll(".upRole")).map((s) => s.value).join(","));
+  fd.append("persons", Array.from(document.querySelectorAll(".upPerson")).map((s) => s.value).join(","));
+  for (const f of files) fd.append("files", f);
+  $("#upStatus").textContent = `uploading ${files.length} files…`;
+  const r = await fetch("/api/upload", { method: "POST", body: fd }); const j = await r.json();
+  if (!r.ok) { $("#upStatus").textContent = "error: " + (j.detail || r.status); return; }
+  $("#upStatus").textContent = `created ${j.name}; pipeline running`; await loadEpisodes(); $("#episode").value = j.name; await loadEpisode(j.name); pollStatus();
+});
