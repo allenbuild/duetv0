@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .episode import Episode
 from .run import ORDER, is_running, run_in_background
+from . import zed_bundle
 
 ROOT = Path(__file__).resolve().parents[3]
 EPISODES = ROOT / "data/playground/episodes"
@@ -74,6 +75,8 @@ async def upload(name: str = Form(...), roles: str = Form(...), persons: str = F
 
     roles/persons are comma-separated, one per file, in file order. Stream names come from the
     filenames (sanitised). The first ego stream is the time reference unless `reference` is given.
+    A .zip produced by scripts/zed_kit.py (ZED export: left.mp4 + calibration + tracking + depth) is
+    accepted as a file too: it is unpacked to <episode>/zed/<stream>/ and its left.mp4 becomes the stream.
     """
     name = re.sub(r"[^A-Za-z0-9_-]+", "_", name.strip())[:64] or "episode"
     if (EPISODES / name).exists():
@@ -88,6 +91,11 @@ async def upload(name: str = Form(...), roles: str = Form(...), persons: str = F
         dst = tmp / f"{stem}{Path(f.filename).suffix.lower() or '.mp4'}"
         with open(dst, "wb") as out:
             shutil.copyfileobj(f.file, out, 16 << 20)
+        if dst.suffix == ".zip":
+            if not zed_bundle.is_bundle(dst):
+                shutil.rmtree(tmp, ignore_errors=True); raise HTTPException(400, f"{f.filename} is not a ZED export bundle")
+            stem = stem[:-4] if stem.endswith("_zed") else stem
+            dst = zed_bundle.ingest(dst, EPISODES / name, stem); role = role if role in ("ego", "exo") else "ego"
         videos.append((stem, role if role in ("ego", "exo") else "exo", dst, person))
     ep = Episode.create(EPISODES, name, videos, None, reference or None, link=False)
     ep.proc_fps = fps; ep.save(); shutil.rmtree(tmp, ignore_errors=True)
