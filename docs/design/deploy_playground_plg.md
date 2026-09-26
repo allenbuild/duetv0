@@ -1,12 +1,14 @@
 # Deploying the playground at plg.duetlabs.co
 
-Status (2026-09-25): the static playground is **live** on Vercel; the custom domain is attached and **waiting on two DNS records at Namecheap**.
+Status (2026-09-25): **https://plg.duetlabs.co is live** (static playground viewer on Vercel, TLS issued, video Range confirmed). DNS records were added at Namecheap the same day; ownership verified through the Vercel API (`POST /v9/projects/{id}/domains/plg.duetlabs.co/verify`, since CLI 48 has no `domains verify`).
+
+Note: the CNAME was saved as `chame.vercel-dns.com` (typo). It resolves to Vercel's IPs, so the site works, but fix it to `cname.vercel-dns.com` when convenient.
 
 | item | value |
 |---|---|
 | live now | https://duet-playground.vercel.app |
 | Vercel project | `duet-playground` (scope `idhantranjans-projects`, Idhant's account) |
-| custom domain | `plg.duetlabs.co` — added to the project, state `pending_domain_verification` |
+| custom domain | `plg.duetlabs.co` — verified, serving |
 | why pending | `duetlabs.co` is registered in Allen's Vercel account (deployed from his GitHub). A different Vercel account may serve a subdomain only after proving control of the apex with a TXT record. |
 
 ## Step 1 — two records at Namecheap (Advanced DNS for duetlabs.co)
