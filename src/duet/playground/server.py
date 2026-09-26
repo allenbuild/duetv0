@@ -171,5 +171,14 @@ def imu_arm(name: str, stream: str):
 
 # videos are served from a static mount because browsers need HTTP Range support to seek (FileResponse lacks it)
 EPISODES.mkdir(parents=True, exist_ok=True)
+# optional API modules: any duet.playground.api_<name>.router is mounted (review, metrics, annotate, release ...)
+import importlib as _il, pkgutil as _pk
+for _m in _pk.iter_modules([str(Path(__file__).parent)]):
+    if _m.name.startswith("api_"):
+        try:
+            app.include_router(_il.import_module(f"duet.playground.{_m.name}").router)
+        except Exception as _e:  # noqa: BLE001
+            print(f"playground: api module {_m.name} not mounted: {_e}")
+
 app.mount("/episodes", StaticFiles(directory=str(EPISODES), follow_symlink=True), name="episodes")
 app.mount("/", StaticFiles(directory=str(STATIC), html=True), name="static")

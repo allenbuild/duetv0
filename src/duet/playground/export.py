@@ -77,5 +77,14 @@ def export(ep: Episode) -> None:
             cols[f"body3d_p{p}"] = list(w[:, p].reshape(n, -1))
         cols["body3d_stream"] = [str(b["stream"])] * n
     df = pd.DataFrame(cols)
+    # any stage may contribute per-frame columns by writing derived/<stage>/records_extra.parquet
+    # (one row per common-timeline frame, no t_s needed; extra rows are cut, missing rows padded with NaN)
+    for extra in sorted(ep.derived.glob("*/records_extra.parquet")):
+        try:
+            ex = pd.read_parquet(extra).iloc[:n]
+        except Exception as e:  # noqa: BLE001
+            ep.notes.append(f"export: could not read {extra.name} from {extra.parent.name}: {e}"); continue
+        ex = ex.reindex(range(n)); ex.columns = [c if c.startswith(extra.parent.name) else f"{extra.parent.name}_{c}" for c in ex.columns]
+        df = pd.concat([df, ex.reset_index(drop=True)], axis=1)
     out = ep.derived / "records.parquet"; df.to_parquet(out, index=False)
     ep.set_status("export", "done", f"{len(df)} rows x {len(df.columns)} columns -> {out.relative_to(ep.dir)}")

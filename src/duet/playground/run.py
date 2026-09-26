@@ -6,24 +6,33 @@ import traceback
 from pathlib import Path
 
 from . import align as _align, depth_mono as _dm, episode as _ep, export as _export, imu_arm as _imu, perception as _p, qc as _qc, scene_scan as _sc, world as _w
+from . import annotate as _ann, autolabel as _al, contact as _ct, gaze_proxy as _gp, metrics as _mt, speech as _sp, stereo_depth as _sd, track as _tr
 
 STAGE_FUNCS = {
     "probe": _ep.probe,
     "align": _align.align,
     "frames": _p.extract_frames,
     "calib": _w.calib,          # intrinsics + board registration (world = board)
+    "stereo_depth": _sd.stereo_depth,  # ZED left/right -> depth PNGs without the ZED SDK
     "body2d": _p.body2d,
+    "track": _tr.track,         # stable person ids
     "hands": _p.hands,
     "objects": _p.objects,
+    "contact": _ct.contact,     # hand-object contact
     "tags": _w.tags,            # AprilTags in fixed views -> world poses
     "headpose": _w.headpose,    # ego camera pose per frame: ZED tracking or head tag
+    "gaze_proxy": _gp.gaze_proxy,  # forward-ray gaze from head pose
     "body3d": _p.body3d,        # monocular fallback
     "world3d": _w.world3d,      # triangulated bodies, metric hands, objects, cross-person features
     "imu_arm": _imu.imu_arm,
     "depth_mono": _dm.depth_mono,
     "scene_scan": _sc.scene_scan,
+    "speech": _sp.speech,       # transcript + who spoke
     "qc": _qc.qc,
     "export": _export.export,
+    "annotate": _ann.annotate,  # dense VLM annotation (event level, JSON)
+    "autolabel": _al.autolabel, # proposed events for review
+    "metrics": _mt.metrics,     # operator metrics
 }
 ORDER = list(STAGE_FUNCS)
 _running: dict[str, threading.Thread] = {}

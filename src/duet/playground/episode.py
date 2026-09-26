@@ -19,7 +19,7 @@ import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-STAGES = ("probe", "align", "frames", "calib", "body2d", "hands", "objects", "tags", "headpose", "body3d", "world3d", "imu_arm", "depth_mono", "scene_scan", "qc", "export")
+STAGES = ("probe", "align", "frames", "calib", "stereo_depth", "body2d", "track", "hands", "objects", "contact", "tags", "headpose", "gaze_proxy", "body3d", "world3d", "imu_arm", "depth_mono", "scene_scan", "speech", "qc", "export", "annotate", "autolabel", "metrics")
 
 
 @dataclass
