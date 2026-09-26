@@ -13,8 +13,9 @@
 const $ = (s) => document.querySelector(s);
 const COCO = [[5,7],[7,9],[6,8],[8,10],[5,6],[5,11],[6,12],[11,12],[11,13],[13,15],[12,14],[14,16],[0,5],[0,6]];
 const HAND = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
-// MediaPipe pose (33): shoulders 11/12, elbows 13/14, wrists 15/16, hips 23/24, knees 25/26, ankles 27/28, nose 0
-const MP33 = [[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[23,25],[25,27],[24,26],[26,28],[0,11],[0,12]];
+// MediaPipe pose (33), upper body only for the monocular 3D panel: shoulders 11/12, elbows 13/14, wrists 15/16, hips 23/24,
+// nose 0. Legs (knees 25/26, ankles 27/28, feet 29-32) are left out: the monocular estimates are too noisy to be useful.
+const MP33_UPPER = [[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[0,11],[0,12]];
 const C = {left:"#57E39B", right:"#FF6B6B", partner:"#FFB36B", body:"#B58CFF", obj:"#3EA7FF", held:"#FFD447", accent:"#3FA58C", mute:"#8A9591"};
 const STATES = new Set(["done", "skipped", "failed", "running", "interrupted", "stale", "queued"]);
 const WIN = 1200, WHOLE_MAX = 3000;  // frames per lazily fetched window; episodes up to WHOLE_MAX frames load in one request
@@ -384,7 +385,7 @@ function drawThree() {
   } else if (B3) {
     // MediaPipe world (camera-aligned): x right, y down, z AWAY from the camera -> scene (x, -y, -z): a rotation (det +1), not
     // a mirror; +0.9 m lifts the hip-centred skeleton above the grid
-    for (const person of B3.d.world[B3.i] || []) { if (!person || person[0][0] == null) continue; segLines("body3d", 0xb58cff, MP33, person.map((p) => (finite3(p) ? [p[0], -p[1] + 0.9, -p[2]] : null))); }
+    for (const person of B3.d.world[B3.i] || []) { if (!person || person[0][0] == null) continue; segLines("body3d", 0xb58cff, MP33_UPPER, person.map((p) => (finite3(p) ? [p[0], -p[1] + 0.9, -p[2]] : null))); }
   }
   for (const [key, sr] of Object.entries(series)) {
     if (!key.startsWith("imu:")) continue;
